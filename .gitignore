@@ -1,0 +1,6 @@
+gmt/.*
+gmt/*.nc
+gmt/*.bin.gz
+gmt/OUTPUTS
+gmt/fronteras
+gmt/GLOBE*

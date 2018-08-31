@@ -1,3 +1,5 @@
+.fonts
+.idea
 gmt/.*
 gmt/*.nc
 gmt/*.bin.gz

@@ -63,11 +63,17 @@ function usage() {
 # Parsea los argumentos pasados al comando a través de la línea de comandos
 function parseOptions() {
     OVERWRITE=0
+
+    if [ $# -eq 0 ]
+    then
+       echo "error: el número de argumentos mínimo es 2" >&2; usage; exit 1
+    fi
+
     if [ $1 != "-h" ]
     then
         if [ $# -lt 2 ]
         then
-           echo "error: el número de argumentos mínimos es 2" >&2; usage; exit 1
+           echo "error: el número de argumentos mínimo es 2" >&2; usage; exit 1
         fi
 
         # Expresiones regulares
@@ -200,6 +206,43 @@ function parseOptions() {
 
 
 
+
+}
+
+
+# Chequea un directorio
+function checkdir () {
+    local dir=$@
+    if [ ! -d ${dir} ] && [ ${OVERWRITE} -eq 0 ]
+    then
+        echo "No existe el directorio ${dir}. ¿Deseas crearlo [(s)/n]?"
+        read var <&0
+        if [ ! -z ${var} ] && [ ${var,,} != "s" ];then
+            exit 0;
+        fi
+    fi
+    mkdir -p ${dir}
+}
+
+# Chequea los directorios y los crea si no existe
+function checkDIRS () {
+
+    DIRROTULOS=${PREFIX}/${DIRROTULOS}
+    DIRESTILOS=${PREFIX}/${DIRESTILOS}
+    DIRLOGOS=${PREFIX}/${DIRLOGOS}
+    DIRFONDOS=${PREFIX}/${DIRFONDOS}
+    DIRFRONTERAS=${PREFIX}/${DIRFRONTERAS}
+    CFGDIR=${PREFIX}/${CFGDIR}
+    GLOBEDIR=${PREFIX}/${GLOBEDIR}
+
+    checkdir ${PREFIX}
+    checkdir ${DIRROTULOS}
+    checkdir ${DIRESTILOS}
+    checkdir ${DIRLOGOS}
+    checkdir ${DIRFONDOS}
+    checkdir ${DIRFRONTERAS}
+    checkdir ${CFGDIR}
+    checkdir ${GLOBEDIR}
 
 }
 
@@ -343,8 +386,13 @@ command -v ${GMT} > /dev/null 2>&1 || { echo "error: ${GMT} no está instalado."
 command -v ${CONVERT}  > /dev/null 2>&1 || { echo "error: ${CONVERT} no está instalado." && exit 1; }
 command -v ${COMPOSITE}  > /dev/null 2>&1 || { echo "error: ${COMPOSITE} no está instalado." && exit 1; }
 
+
+
+
 # Parseamos los argumentos de entrada
 parseOptions $@
+
+checkDIRS
 
 printMessage "Generando mapas y archivo de configuración:"
 printMessage "longitud: ${lon}, latitud: ${lat}, zoom: ${zoom}, ancho: ${xsize}, alto: ${ysize}"
@@ -480,6 +528,13 @@ then
     GLOBEFILE="${GLOBEDIR}/globe${resformat}.grd"
     if [ ! -f ${GLOBEFILE} ]
     then
+        ficherosglobe=`ls -1 ${GLOBEDIR} |  sed -n '/globe.*.grd/p'`
+
+        if [ $(ls -1 ${GLOBEDIR} |  sed -n '/globe.*.grd/p' | wc -l ) -eq 0 ]
+        then
+             echo "error: no se encontró ningun fichero globe dentro de ${GLOBEDIR}" >&2; exit 1
+        fi
+
         # Si el fichero no existe se busca la resolución mayor más proxima a la resolución deseada
         rescercana=`ls -1 ${GLOBEDIR} |  sed -n '/globe.*.grd/p' | sed 's/globe\(.*\).grd/\1/;s/s//;s/m/\*60/' | bc \
          | sort -n | awk -v res=${resolucion} 'NR==1{anterior=$1}{if($1>res){print anterior; noend=1; exit;}anterior=$1}END{if(noend==0)print $1}' \
@@ -534,11 +589,13 @@ printMessage "Generando mapas"
 w=${xlength}
 h=${ylength}
 
+X="-Xc${xdes}c"
+Y="-Yc${ydes}c"
 
 # Creamos el fichero base en donde pintamos el fondo gris de los continentes con las dimensiones anteriores
-${GMT} psbasemap ${J} ${R} -B+n -Xc${xdes}c -Yc${ydes}c --PS_MEDIA="${w}cx${h}c" -P -K > ${outputPS}
+${GMT} psbasemap ${J} ${R} -B+n ${X} ${Y} --PS_MEDIA="${w}cx${h}c" -P -K > ${outputPS}
 # Creamos el fichero en donde pintamos el país seleccionado con relieve con las dimensiones anteriores
-${GMT} psbasemap -J -R -B+n -Xc${xdes}c -Yc${ydes}c --PS_MEDIA="${w}cx${h}c" -P -K > ${tmpPS}
+${GMT} psbasemap ${J} ${R} -B+n ${X} ${Y} --PS_MEDIA="${w}cx${h}c" -P -K > ${tmpPS}
 
 
 #Si se ha definido un país en cod pintamos los continentes en gris y solo pintamos en color la región
@@ -549,8 +606,8 @@ then
     nlines=$(sed '/^#/d' ${tmpREG}| wc -l)
     if [ ${nlines} -gt 0 ]
     then
-        ${GMT} pscoast -J -R -E=EU,=AF -A500 -Df -Ggray75 -X -Y --PS_MEDIA="${w}cx${h}c" -P -K -O >> ${outputPS}
-        ${GMT} psclip ${tmpREG} -R -J -K -O -X -Y --PS_MEDIA="${w}cx${h}c" -P >> ${tmpPS}
+        ${GMT} pscoast ${J} ${R} -E=EU,=AF -A500 -Df -Ggray75 ${X} ${Y} --PS_MEDIA="${w}cx${h}c" -P -K -O >> ${outputPS}
+        ${GMT} psclip ${tmpREG} ${J} ${R} -K -O ${X} ${Y} --PS_MEDIA="${w}cx${h}c" -P >> ${tmpPS}
     else
         echo "error: no se encontró el código ${cod}" >&2; usage; exit 1
     fi
@@ -558,18 +615,18 @@ then
 fi
 
 # Pintamos el fichero GLOBE
-${GMT} grdimage  -Q -E${dpi} -J -R ${GLOBEFILE} -C${CPTGLOBE} -X -Y --PS_MEDIA="${w}cx${h}c" -P -K -O >> ${tmpPS}
+${GMT} grdimage  -Q -E${dpi} ${J} ${R} ${X} ${Y} ${GLOBEFILE} -C${CPTGLOBE} --PS_MEDIA="${w}cx${h}c" -P -K -O >> ${tmpPS}
 
 
 
 # Si se definió un país
 if [ ! -z ${cod} ]
 then
-    ${GMT} psclip -R -J -O -K -C >> ${tmpPS}
+    ${GMT} psclip ${J} ${R} -O -K -C >> ${tmpPS}
 fi
 
 # Convertimos el mapa de relieve a formato PNG
-${GMT} psbasemap -J -R -B+n -O >> ${tmpPS}
+${GMT} psbasemap ${J} ${R} -B+n -O >> ${tmpPS}
 ${GMT} psconvert -E${dpi} ${tmpPS}  -P -TG -Qg1 -Qt4
 
 
@@ -590,7 +647,7 @@ ${CONVERT} ${tmpPNG} \( +clone -background black -flatten -white-threshold 0% -m
 
 
 
-${GMT} psbasemap -J -R -B+n -O >> ${outputPS}
+${GMT} psbasemap ${J} ${R} -B+n -O >> ${outputPS}
 ${GMT} psconvert -E${dpi} ${outputPS} -P -TG -Qg1 -Qt4
 
 # Para sacar las fronteras sobre un mapa con región añadimos bordes blancos al mapa en gris, umbralizamos para quedarnos
@@ -612,7 +669,7 @@ if [ ! -z ${global} ] && [  ${global} -eq 1 ]
 then
 
     # Creamos una una mascara en blanco para el globo sobre un fondo negro
-    ${GMT} pscoast -J -R -Swhite -Gwhite -X -Y --PS_MEDIA="${w}cx${h}c" -P > ${tmpPS}
+    ${GMT} pscoast ${J} ${R} ${X} ${Y} -Swhite -Gwhite --PS_MEDIA="${w}cx${h}c" -P > ${tmpPS}
     ${GMT} psconvert ${tmpPS} -E${dpi} -P -TG -Qg1 -Qt4
 
     ${CONVERT} \( -size ${xsize}x${ysize} xc:black \) ${tmpPNG} -composite -white-threshold 0% ${tmpPNG}

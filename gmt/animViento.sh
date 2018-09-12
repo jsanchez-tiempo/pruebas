@@ -1,5 +1,10 @@
 #!/bin/bash
 
+
+
+
+
+
 #source cfg/spain2.cfg
 #source cfg/cvalenciana2.cfg
 source cfg/europa2.cfg

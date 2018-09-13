@@ -78,7 +78,8 @@ function parseOptions() {
 
         # Expresiones regulares
         refloat="^[+-]?[0-9]+([.][0-9]+)?$"
-        reint="^[0-9]+$"
+        reint="^[+-]?[0-9]+$"
+        repos="^[0-9]+$"
         reres="^[0-9]+[m|s]+$"
 
         # Chequeamos la longitud
@@ -134,14 +135,14 @@ function parseOptions() {
         -x)
             shift
             xsize=$1
-            if ! [[ ${xsize} =~ $reint ]] ; then
+            if ! [[ ${xsize} =~ $repos ]] ; then
                 echo "error: xsize no es un número entero positivo" >&2; usage; exit 1
             fi
             ;;
         -y)
             shift
             ysize=$1
-            if ! [[ ${ysize} =~ $reint ]] ; then
+            if ! [[ ${ysize} =~ $repos ]] ; then
                 echo "error: ysize no es un número entero positivo" >&2; usage; exit 1
             fi
             ;;
@@ -185,14 +186,14 @@ function parseOptions() {
             shift;
             xdesinicial=$1
             if ! [[ ${xdesinicial} =~ $reint ]] ; then
-                echo "error: xdes no es un número entero positivo" >&2; usage; exit 1
+                echo "error: xdes no es un número entero" >&2; usage; exit 1
             fi
             ;;
         --ydes)
             shift;
             ydesinicial=$1
             if ! [[ ${ydesinicial} =~ $reint ]] ; then
-                echo "error: ydes no es un número entero positivo" >&2; usage; exit 1
+                echo "error: ydes no es un número entero" >&2; usage; exit 1
             fi
             ;;
         --)
@@ -383,6 +384,7 @@ function buscarFrontera () {
 
 }
 
+cd `dirname $0`
 
 # Cargamos las variables de configuración y las funciones
 source defaults.cfg

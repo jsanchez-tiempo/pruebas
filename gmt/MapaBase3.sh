@@ -221,7 +221,7 @@ function checkdir () {
             exit 0;
         fi
     fi
-    mkdir -p ${dir}
+    mkdir -p ${dir} || exit 1
 }
 
 # Chequea los directorios y los crea si no existe
@@ -233,6 +233,7 @@ function checkDIRS () {
     DIRFONDOS=${PREFIX}/${DIRFONDOS}
     DIRFRONTERAS=${PREFIX}/${DIRFRONTERAS}
     CFGDIR=${PREFIX}/${CFGDIR}
+    CPTDIR=${PREFIX}/${CPTDIR}
     GLOBEDIR=${PREFIX}/${GLOBEDIR}
 
     checkdir ${PREFIX}
@@ -242,6 +243,7 @@ function checkDIRS () {
     checkdir ${DIRFONDOS}
     checkdir ${DIRFRONTERAS}
     checkdir ${CFGDIR}
+    checkdir ${CPTDIR}
     checkdir ${GLOBEDIR}
 
 }
@@ -255,6 +257,11 @@ function writeGeogCFG () {
     echo "### Resolución"
     echo "resolucion=${resformat}"
     echo "GLOBEFILE=${GLOBEFILE}"
+    echo
+    echo "### Dimensiones"
+    echo "xsize=${xsize}"
+    echo "ysize=${ysize}"
+    echo "dpi=${dpi}"
     echo
     if [ ! -z ${global} ] && [ ${global} -eq 1 ]
     then
@@ -398,6 +405,22 @@ printMessage "Generando mapas y archivo de configuración:"
 printMessage "longitud: ${lon}, latitud: ${lat}, zoom: ${zoom}, ancho: ${xsize}, alto: ${ysize}"
 printMessage "desplazamiento horizontal: ${xdesinicial}, desplazamiento vertical: ${ydesinicial}"
 
+
+# Copia el archivo de fondo del mar a la carpeta de fondos
+if [ $(dirname $(realpath ${fondomar} )) !=  $(realpath ${DIRFONDOS}) ]
+then
+    if [ ${OVERWRITE} -eq 0 ]
+    then
+        echo "El archivo del fondo del mar no se encuentra en la carpeta de fondos. ¿Deseas copiarlo [(s)/n]?"
+        read var <&0
+        if [ ! -z ${var} ] && [ ${var,,} != "s" ];then
+            exit 0;
+        fi
+    fi
+    cp -f ${fondomar} ${DIRFONDOS}
+    fondomar=${DIRFONDOS}/`basename ${fondomar}`
+fi
+
 fondomarsrc=${fondomar}
 
 # Definición de los ficheros de mapas de salida
@@ -489,6 +512,10 @@ then
         ${GMT} grdsample ${GLOBEFILESOURCE} -I${resformat} -G${GLOBEFILE}
     fi
 else
+    if [ ! -f ${GLOBEFILE} ]
+    then
+        echo "error: No existe el archivo de altitud ${GLOBEFILE}." && exit 1;
+    fi
     resolucion=`awk -v grados=${dlat} -v z=${zoom} 'BEGIN{z=int(z); print int(3600*grados*z+0.5); }'`
     resformat=`awk -v secs=${resolucion} 'BEGIN{if(secs%60==0)print secs/60"m"; else print secs"s";}'`
     printMessage "Resolución calculada a partir del zoom: ${resformat}"
@@ -532,7 +559,20 @@ then
 
         if [ $(ls -1 ${GLOBEDIR} |  sed -n '/globe.*.grd/p' | wc -l ) -eq 0 ]
         then
-             echo "error: no se encontró ningun fichero globe dentro de ${GLOBEDIR}" >&2; exit 1
+            if [ -f ${GLOBEFILESOURCE} ]
+            then
+             echo "error: no se encontró ningun fichero globe dentro de ${GLOBEDIR} ni tampoco el archivo\
+              fuente ${GLOBEFILESOURCE}" >&2; exit 1
+            elif [ ${OVERWRITE} -eq 0 ]
+            then
+                echo "No se encontró ningun fichero globe dentro de ${GLOBEDIR}. ¿Deseas crear globe${resformat}.grd [(s)/n]?"
+                read var <&0
+                if [ ! -z ${var} ] && [ ${var,,} != "s" ];then
+                    exit 0;
+                fi
+            fi
+            ${GMT} grdsample ${GLOBEFILESOURCE} -I${resformat} -G${GLOBEFILE}
+
         fi
 
         # Si el fichero no existe se busca la resolución mayor más proxima a la resolución deseada
@@ -695,7 +735,7 @@ if [ ! -z ${global} ] && [  ${global} -eq 1 ]
 then
     # Le metemos el efecto de luz
     ${COMPOSITE} ${outputPNG} ${TMPDIR}/difu.png  ${outputPNG}
-    # Le metemos un fondo oscuro aunque no negro del todo
+    # Le metemos un fondo oscuro
     ${CONVERT}   -size ${xsize}x${ysize} xc:"rgb(20,20,20)"  \( ${tmpPNG} -transparent black \) -compose DstOut -composite\
      -transparent black  ${outputPNG} -compose over  -composite  ${outputPNG}
 fi

@@ -406,6 +406,13 @@ printMessage "longitud: ${lon}, latitud: ${lat}, zoom: ${zoom}, ancho: ${xsize},
 printMessage "desplazamiento horizontal: ${xdesinicial}, desplazamiento vertical: ${ydesinicial}"
 
 
+# Comprobamos que existe el fondo del mar
+if [ ! -f ${fondomar} ]
+then
+    echo "error: No se ha encontrado el archivo de fondo de mar  ${fondomar}."
+    exit 1
+fi
+
 # Copia el archivo de fondo del mar a la carpeta de fondos
 if [ $(dirname $(realpath ${fondomar} )) !=  $(realpath ${DIRFONDOS}) ]
 then
@@ -682,8 +689,8 @@ ${CONVERT} ${tmpPNG} -level -15%,105% ${tmpPNG}
 
 # Le añadimos un borde blanco alrededor del mapa de relieve.
 # Sobre una imagen umbralizada en blanco aplicamos una dilatación y sobreponemos la original sobre esta
-${CONVERT} ${tmpPNG} \( +clone -background black -flatten -white-threshold 0% -morphology Dilate Octagon:3\
- -transparent black \) +swap -composite ${tmpPNG}
+${CONVERT} ${tmpPNG} \( +clone -background black -flatten -white-threshold 0% -morphology Dilate Octagon:2\
+ -transparent black -blur 0x0.5 \) +swap -composite ${tmpPNG}
 
 
 
@@ -695,14 +702,15 @@ ${GMT} psconvert -E${dpi} ${outputPS} -P -TG -Qg1 -Qt4
 # seleccionada
 if [ ! -z ${cod} ]
 then
-    ${CONVERT} ${outputPNG} \( +clone -background black -flatten -white-threshold 10% -morphology Dilate Octagon:3\
-     -transparent black \) +swap -composite \( +clone -background white -flatten -negate  \) +swap -composite -threshold 98%\
+    ${CONVERT} ${outputPNG} \( +clone -background black -flatten -white-threshold 10% -morphology Dilate Octagon:2\
+     -transparent black -blur 0x0.5 \) +swap -composite \( +clone -background white -flatten -negate  \) +swap -composite -threshold 98%\
      -transparent black -fill lightgray -opaque white  ${fronterasPNG}
 fi
 
 
 # Unimos el mapa con relieve de la región seleccionada con el del mapa de los continentes en gris
 ${COMPOSITE} ${tmpPNG} ${outputPNG} ${outputPNG}
+
 
 
 if [ ! -z ${global} ] && [  ${global} -eq 1 ]
@@ -718,7 +726,12 @@ then
     ${CONVERT} ${tmpPNG} -transparent black \( +clone  -blur 0x20 \) -compose Out -composite  ${TMPDIR}/difu.png
 
     # Al hacer el dilatado en los bordes del planeta se queda una línea blanca. Se lo quitamos con la mascara
-    ${CONVERT} ${tmpPNG} \( ${outputPNG} -background black -flatten \) -compose multiply -composite -transparent black ${outputPNG}
+    # Al aplicar el suavizado de las fronteras se crean transparencias y con flatten y el transparent se quedaba un
+    # borde negro. Para solucionarlo se separa el canal alpha de la parte visible y se aplica la mascara a cada parte
+    # por separado para después volver a unirlos
+    ${CONVERT} ${tmpPNG} ${outputPNG} \( +clone -channel RGB -separate -combine -background black -flatten \) -swap 0,1 \
+     \( -clone -1,-2 -compose multiply -composite  -transparent black \) \( -clone 0 -channel A -separate +channel \) \
+     \( -clone 1,-1 -compose multiply -composite \) -delete 0,1,2,4 -compose copy-opacity -composite  ${outputPNG}
 
     # Aplicamos la mascara a la imagen del mar
     ${CONVERT} ${tmpPNG} ${fondomar} -compose multiply -composite -transparent black ${tmpPNG}
@@ -729,6 +742,7 @@ fi
 # Le añadimos una sombra a los continentes
 dims=`${CONVERT} ${outputPNG} -format "%wx%h" info:`
 ${CONVERT} ${outputPNG} \( +clone -background gray -shadow 30x3+3+3 -crop ${dims}+0+0 \) +swap -composite ${outputPNG}
+
 
 #Global
 if [ ! -z ${global} ] && [  ${global} -eq 1 ]

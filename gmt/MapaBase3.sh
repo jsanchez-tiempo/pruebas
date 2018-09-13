@@ -559,10 +559,10 @@ then
 
         if [ $(ls -1 ${GLOBEDIR} |  sed -n '/globe.*.grd/p' | wc -l ) -eq 0 ]
         then
-            if [ -f ${GLOBEFILESOURCE} ]
+            if [ ! -f ${GLOBEFILESOURCE} ]
             then
-             echo "error: no se encontró ningun fichero globe dentro de ${GLOBEDIR} ni tampoco el archivo\
-              fuente ${GLOBEFILESOURCE}" >&2; exit 1
+             echo -n "error: no se encontró ningun fichero globe dentro de ${GLOBEDIR} ni tampoco el archivo "
+             echo "fuente ${GLOBEFILESOURCE}" >&2; exit 1
             elif [ ${OVERWRITE} -eq 0 ]
             then
                 echo "No se encontró ningun fichero globe dentro de ${GLOBEDIR}. ¿Deseas crear globe${resformat}.grd [(s)/n]?"

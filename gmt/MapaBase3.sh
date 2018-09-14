@@ -131,6 +131,9 @@ function parseOptions() {
             if (( $(echo "${zoom} <= -0" | bc -l) )); then
                echo "error: zoom debe ser mayor que 0" >&2; usage; exit 1
             fi
+            if (( $(echo "${zoom} > 1000" | bc -l) )); then
+               echo "error: zoom no puede ser mayor que 1000" >&2; usage; exit 1
+            fi
             ;;
         -x)
             shift
@@ -382,9 +385,9 @@ source defaults.cfg
 source funciones.sh
 
 # Comprobación de que existe el software.
-command -v ${GMT} > /dev/null 2>&1 || { echo "error: ${GMT} no está instalado." && exit 1; }
-command -v ${CONVERT}  > /dev/null 2>&1 || { echo "error: ${CONVERT} no está instalado." && exit 1; }
-command -v ${COMPOSITE}  > /dev/null 2>&1 || { echo "error: ${COMPOSITE} no está instalado." && exit 1; }
+command -v ${GMT} > /dev/null 2>&1 || { echo "error: ${GMT} no está instalado." >&2 && exit 1; }
+command -v ${CONVERT}  > /dev/null 2>&1 || { echo "error: ${CONVERT} no está instalado." >&2 && exit 1; }
+command -v ${COMPOSITE}  > /dev/null 2>&1 || { echo "error: ${COMPOSITE} no está instalado." >&2 && exit 1; }
 
 
 
@@ -398,6 +401,23 @@ printMessage "Generando mapas y archivo de configuración:"
 printMessage "longitud: ${lon}, latitud: ${lat}, zoom: ${zoom}, ancho: ${xsize}, alto: ${ysize}"
 printMessage "desplazamiento horizontal: ${xdesinicial}, desplazamiento vertical: ${ydesinicial}"
 
+
+### COMPROBACIONES
+
+# Comprobamos que el desplazamiento no es mayor que el tamaño
+if [ ${xdesinicial} -lt -${xsize} ] ||  [ ${xdesinicial} -gt ${xsize} ]
+then
+    echo "error: el desplazamiento ${xdesinicial} no puede ser mayor que su tamaño ${xsize}" >&2
+    exit 1
+fi
+
+if [ ${ydesinicial} -lt -${ysize} ] ||  [ ${xdesinicial} -gt ${ysize} ]
+then
+    echo "error: el desplazamiento ${ydesinicial} no puede ser mayor que su tamaño ${ysize}" >&2
+    exit 1
+fi
+
+
 # Comprobamos que hay archivos de fronteras
 array=(`echo ${cod} | tr '.' ' '`)
 i=$((${#array[@]}-1))
@@ -405,7 +425,7 @@ if [ ! -z ${cod} ] && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.shp ] && [ ! -f ${DI
     && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.dpg ] && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.shx ] \
     && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.prj ]
 then
-    echo "error: No se han encontrado los archivos de límites geográficos gadm28_adm${i}.* ."
+    echo "error: No se han encontrado los archivos de límites geográficos gadm28_adm${i}.* ." >&2
     exit 1
 fi
 
@@ -413,14 +433,14 @@ fi
 # Comprobamos que existe el fondo del mar
 if [ ${sombratierra} -eq 1 ] && [ ! -f ${filesombra} ]
 then
-    echo "error: No se ha encontrado el archivo de sombra ${filesombra}."
+    echo "error: No se ha encontrado el archivo de sombra ${filesombra}." >&2
     exit 1
 fi
 
 # Comprobamos que existe el fichero CPT
 if [ ! -f ${CPTGLOBE} ]
 then
-    echo "error: No se ha encontrado el archivo CPT ${CPTGLOBE}."
+    echo "error: No se ha encontrado el archivo CPT ${CPTGLOBE}." >&2
     exit 1
 fi
 
@@ -428,7 +448,7 @@ fi
 # Comprobamos que existe el fondo del mar
 if [ ! -f ${fondomar} ]
 then
-    echo "error: No se ha encontrado el archivo de fondo de mar  ${fondomar}."
+    echo "error: No se ha encontrado el archivo de fondo de mar  ${fondomar}." >&2
     exit 1
 fi
 
@@ -451,12 +471,13 @@ fondomarsrc=${fondomar}
 
 
 # Creamos el directorio temporal de trabajo
-TMPDIR="/tmp/`basename $(type $0 | awk '{print $3}').$$`"
+TMPDIR="/tmp/${scriptName}.$$"
+#TMPDIR="/tmp/`basename $(type $0 | awk '{print $3}').$$`"
 mkdir -p ${TMPDIR}
 
 # Definimos que el script pare si se captura alguna señal de terminación o se produce algún error
-trap "rm -rf ${TMPDIR}; echo 'error: señal interceptada. Saliendo';exit 1" 1 2 3 15
-trap "echo 'error: ha fallado la ejecución. Saliendo' ;exit 1" ERR
+trap "rm -rf ${TMPDIR}; echo 'error: señal interceptada. Saliendo' >&2;exit 1" 1 2 3 15
+trap "echo 'error: ha fallado la ejecución. Saliendo' >&2;exit 1" ERR
 
 
 # Definición de los ficheros de mapas de salida
@@ -552,7 +573,7 @@ then
 else
     if [ ! -f ${GLOBEFILE} ]
     then
-        echo "error: No existe el archivo de altitud ${GLOBEFILE}." && exit 1;
+        echo "error: No existe el archivo de altitud ${GLOBEFILE}." >&2 && exit 1;
     fi
     resolucion=`awk -v grados=${dlat} -v z=${zoom} 'BEGIN{z=int(z); print int(3600*grados*z+0.5); }'`
     resformat=`awk -v secs=${resolucion} 'BEGIN{if(secs%60==0)print secs/60"m"; else print secs"s";}'`
@@ -599,7 +620,7 @@ then
         then
             if [ ! -f ${GLOBEFILESOURCE} ]
             then
-             echo -n "error: no se encontró ningun fichero globe dentro de ${GLOBEDIR} ni tampoco el archivo "
+             echo -n "error: no se encontró ningun fichero globe dentro de ${GLOBEDIR} ni tampoco el archivo " >&2
              echo "fuente ${GLOBEFILESOURCE}" >&2; exit 1
             elif [ ${OVERWRITE} -eq 0 ]
             then

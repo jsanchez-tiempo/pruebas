@@ -228,15 +228,6 @@ function checkdir () {
 # Chequea los directorios y los crea si no existe
 function checkDIRS () {
 
-    DIRROTULOS=${PREFIX}/${DIRROTULOS}
-    DIRESTILOS=${PREFIX}/${DIRESTILOS}
-    DIRLOGOS=${PREFIX}/${DIRLOGOS}
-    DIRFONDOS=${PREFIX}/${DIRFONDOS}
-    DIRFRONTERAS=${PREFIX}/${DIRFRONTERAS}
-    CFGDIR=${PREFIX}/${CFGDIR}
-    CPTDIR=${PREFIX}/${CPTDIR}
-    GLOBEDIR=${PREFIX}/${GLOBEDIR}
-
     checkdir ${PREFIX}
     checkdir ${DIRROTULOS}
     checkdir ${DIRESTILOS}
@@ -407,6 +398,32 @@ printMessage "Generando mapas y archivo de configuración:"
 printMessage "longitud: ${lon}, latitud: ${lat}, zoom: ${zoom}, ancho: ${xsize}, alto: ${ysize}"
 printMessage "desplazamiento horizontal: ${xdesinicial}, desplazamiento vertical: ${ydesinicial}"
 
+# Comprobamos que hay archivos de fronteras
+array=(`echo ${cod} | tr '.' ' '`)
+i=$((${#array[@]}-1))
+if [ ! -z ${cod} ] && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.shp ] && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.dbf ] \
+    && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.dpg ] && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.shx ] \
+    && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.prj ]
+then
+    echo "error: No se han encontrado los archivos de límites geográficos gadm28_adm${i}.* ."
+    exit 1
+fi
+
+
+# Comprobamos que existe el fondo del mar
+if [ ${sombratierra} -eq 1 ] && [ ! -f ${filesombra} ]
+then
+    echo "error: No se ha encontrado el archivo de sombra ${filesombra}."
+    exit 1
+fi
+
+# Comprobamos que existe el fichero CPT
+if [ ! -f ${CPTGLOBE} ]
+then
+    echo "error: No se ha encontrado el archivo CPT ${CPTGLOBE}."
+    exit 1
+fi
+
 
 # Comprobamos que existe el fondo del mar
 if [ ! -f ${fondomar} ]
@@ -432,16 +449,26 @@ fi
 
 fondomarsrc=${fondomar}
 
+
+# Creamos el directorio temporal de trabajo
+TMPDIR="/tmp/`basename $(type $0 | awk '{print $3}').$$`"
+mkdir -p ${TMPDIR}
+
+# Definimos que el script pare si se captura alguna señal de terminación o se produce algún error
+trap "rm -rf ${TMPDIR}; echo 'error: señal interceptada. Saliendo';exit 1" 1 2 3 15
+trap "echo 'error: ha fallado la ejecución. Saliendo' ;exit 1" ERR
+
+
 # Definición de los ficheros de mapas de salida
-outputPS=${DIRFONDOS}/${outputFile}.ps
-outputPNG=${DIRFONDOS}/${outputFile}.png # mapa completo
-outputsmPNG=${DIRFONDOS}/${outputFile}sm.png # sin mar
-outputbwPNG=${DIRFONDOS}/${outputFile}bw.png # fronteras blancas
-outputbbPNG=${DIRFONDOS}/${outputFile}bb.png # fronteras negras
-outputSombraPNG="${DIRFONDOS}/${outputFile}sombra.png" # Fichero de sombra (solo global)
+#outputFinalPS=${DIRFONDOS}/${outputFile}.ps
+outputFinalPNG=${DIRFONDOS}/${outputFile}.png # mapa completo
+outputFinalsmPNG=${DIRFONDOS}/${outputFile}sm.png # sin mar
+outputFinalbwPNG=${DIRFONDOS}/${outputFile}bw.png # fronteras blancas
+outputFinalbbPNG=${DIRFONDOS}/${outputFile}bb.png # fronteras negras
+outputFinalSombraPNG="${DIRFONDOS}/${outputFile}sombra.png" # Fichero de sombra (solo global)
 
 # Si existe alguno preguntamos si se quiere sobreescribir
-if ([ -f ${outputPNG} ] || [ -f ${outputsmPNG} ] || [ -f ${outputbwPNG} ] || [ -f ${outputbbPNG} ])&&[ ${OVERWRITE} -eq 0 ]
+if ([ -f ${outputFinalPNG} ] || [ -f ${outputFinalsmPNG} ] || [ -f ${outputFinalbwPNG} ] || [ -f ${outputFinalbbPNG} ])&&[ ${OVERWRITE} -eq 0 ]
 then
     echo "Ya existe un fichero con nombre ${outputPNG}. ¿Deseas sobreescribirlo [(s)/n]?"
     read var <&0
@@ -449,6 +476,15 @@ then
         exit 0;
     fi
 fi
+
+# Solo sí el proceso entero ha finalizado correctamente se escribiran los mapas
+outputPS=${TMPDIR}/${outputFile}.ps
+outputPNG=${TMPDIR}/${outputFile}.png # mapa completo
+outputsmPNG=${TMPDIR}/${outputFile}sm.png # sin mar
+outputbwPNG=${TMPDIR}/${outputFile}bw.png # fronteras blancas
+outputbbPNG=${TMPDIR}/${outputFile}bb.png # fronteras negras
+outputSombraPNG="${TMPDIR}/${outputFile}sombra.png" # Fichero de sombra (solo global)
+
 
 # Definición del ficheros de configuración
 cfgFile=${CFGDIR}/${outputFile}.cfg
@@ -464,13 +500,6 @@ then
 fi
 
 
-# Creamos el directorio temporal de trabajo
-TMPDIR="/tmp/`basename $(type $0 | awk '{print $3}').$$`"
-mkdir -p ${TMPDIR}
-
-# Definimos que el script pare si se captura alguna señal de terminación o se produce algún error
-trap "rm -rf ${TMPDIR}; rm -f ${outputPS}; echo 'error: señal interceptada. Saliendo';exit 1" 1 2 3 15
-trap "echo 'error: ha fallado la ejecución. Saliendo' ;exit 1" ERR
 
 # Definición de archivos temporales de trabajo
 tmpFile="${TMPDIR}/kk"
@@ -808,7 +837,15 @@ printMessage "Generando fichero de configuración"
 writeGeogCFG > ${cfgFile}
 
 
+# Copiamos los archivos finales
+cp -f ${outputPNG} ${outputFinalPNG}
+cp -f ${outputsmPNG} ${outputFinalsmPNG}
+cp -f ${outputbwPNG} ${outputFinalbwPNG}
+cp -f ${outputbbPNG} ${outputFinalbbPNG}
+cp -f ${outputSombraPNG} ${outputFinalSombraPNG}
+
 
 printMessage "¡Se han generado los mapas con exito!"
+
 
 rm -rf ${TMPDIR}; rm -f ${outputPS}

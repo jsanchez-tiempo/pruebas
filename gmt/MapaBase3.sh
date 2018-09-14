@@ -316,7 +316,7 @@ function changeHSL () {
 
     if [ `echo "${L}<=100" | bc -l` -eq 1 ]
     then
-        ${CONVERT} ${file} -modulate ${L},${S},${H} ${file}
+        ${CONVERT} ${file} -modulate ${L},${S},${H} png32:${file}
     else
         # Si la luminosidad es mayor que 100 normalizamos el valor a añadir "l" entre 0 y 1. Establecemos la nueva
         # luminosidad como l*(100-L). Queda raro pero GIMP lo hace así
@@ -325,7 +325,7 @@ function changeHSL () {
         ${CONVERT} ${file} -modulate 100,${S},${H}  \( +clone \( +clone -colorspace HSL -separate \) \
           \( -clone -1 -size ${dims}  xc:white -compose minus -composite -evaluate multiply ${L} \) \
           \( -clone -1,-2 -compose plus -composite \) -delete 0,-2,-3 -combine -set colorspace HSL -colorspace sRGB \) \
-          \( -clone 0 -channel A -separate \) -delete 0 -compose copy-opacity -composite ${file}
+          \( -clone 0 -channel A -separate \) -delete 0 -compose copy-opacity -composite png32:${file}
     fi
 
 
@@ -354,7 +354,7 @@ function colorBalance () {
         \( +clone -channel green -evaluate multiply ${G} +channel -channel blue -evaluate multiply ${B} +channel \
          -channel red -evaluate multiply ${R} +channel -colorspace HSL -separate -delete -1 \) \
         \( -clone 0 -colorspace HSL -separate -delete -2,-3  \) -delete 0 -combine -set colorspace HSL -colorspace sRGB  \) \
-     \( -clone 0 -channel A -separate \) -delete 0 -compose copy-opacity -composite ${file}
+     \( -clone 0 -channel A -separate \) -delete 0 -compose copy-opacity -composite png32:${file}
 
 
 }
@@ -539,7 +539,7 @@ tmpREG="${TMPDIR}/tmpREG.gmt"
 
 # Calculamos la altura de la imagen Y en cm y el dpi (pixeles por pulgada)
 ylength=`awk -v xlength=${xlength} -v xsize=${xsize} -v ysize=${ysize} 'BEGIN{printf "%.4f\n",xlength*ysize/xsize}'`
-dpi=`awk -v cm2inch=${cm2inch} -v xlength=${xlength} -v xsize=${xsize} 'BEGIN{printf "%d\n",xsize/(xlength*cm2inch)}'`
+dpi=`awk -v cm2inch=${cm2inch} -v xlength=${xlength} -v xsize=${xsize} 'BEGIN{printf "%d\n",int(xsize/(xlength*cm2inch)+0.5)}'`
 
 
 # Calculamosel desplazamiento X y Y en cm
@@ -728,8 +728,6 @@ fi
 ${GMT} psbasemap ${J} ${R} -B+n -O >> ${tmpPS}
 ${GMT} psconvert -E${dpi} ${tmpPS}  -P -TG -Qg1 -Qt4
 
-
-
 # Le cambiamos el tono, le quitamos saturación y le damos luminosidad
 changeHSL ${tmpPNG} 8 -40 30
 
@@ -737,12 +735,12 @@ changeHSL ${tmpPNG} 8 -40 30
 colorBalance ${tmpPNG} 7 -2 -5
 
 # Le quitamos contraste a la imagen
-${CONVERT} ${tmpPNG} -level -15%,105% ${tmpPNG}
+${CONVERT} ${tmpPNG} -level -15%,105% png32:${tmpPNG}
 
 # Le añadimos un borde blanco alrededor del mapa de relieve.
 # Sobre una imagen umbralizada en blanco aplicamos una dilatación y sobreponemos la original sobre esta
 ${CONVERT} ${tmpPNG} \( +clone -background black -flatten -white-threshold 0% -morphology Dilate Octagon:2\
- -transparent black -blur 0x0.5 \) +swap -composite ${tmpPNG}
+ -transparent black -blur 0x0.5 \) +swap -composite png32:${tmpPNG}
 
 
 
@@ -756,12 +754,13 @@ if [ ! -z ${cod} ]
 then
     ${CONVERT} ${outputPNG} \( +clone -background black -flatten -white-threshold 10% -morphology Dilate Octagon:2\
      -transparent black -blur 0x0.5 \) +swap -composite \( +clone -background white -flatten -negate  \) +swap -composite -threshold 98%\
-     -transparent black -fill lightgray -opaque white  ${fronterasPNG}
+     -transparent black -fill lightgray -opaque white  png32:${fronterasPNG}
 fi
 
 
+
 # Unimos el mapa con relieve de la región seleccionada con el del mapa de los continentes en gris
-${COMPOSITE} ${tmpPNG} ${outputPNG} ${outputPNG}
+${COMPOSITE} ${tmpPNG} ${outputPNG} png32:${outputPNG}
 
 
 
@@ -775,7 +774,7 @@ then
     ${CONVERT} \( -size ${xsize}x${ysize} xc:black \) ${tmpPNG} -composite -white-threshold 0% ${tmpPNG}
 
     # Sobre la mascara creamos el efecto de luz que hay en el borde del planeta
-    ${CONVERT} ${tmpPNG} -transparent black \( +clone  -blur 0x20 \) -compose Out -composite  ${TMPDIR}/difu.png
+    ${CONVERT} ${tmpPNG} -transparent black \( +clone  -blur 0x20 \) -compose Out -composite  png32:${TMPDIR}/difu.png
 
     # Al hacer el dilatado en los bordes del planeta se queda una línea blanca. Se lo quitamos con la mascara
     # Al aplicar el suavizado de las fronteras se crean transparencias y con flatten y el transparent se quedaba un
@@ -783,27 +782,27 @@ then
     # por separado para después volver a unirlos
     ${CONVERT} ${tmpPNG} ${outputPNG} \( +clone -channel RGB -separate -combine -background black -flatten \) -swap 0,1 \
      \( -clone -1,-2 -compose multiply -composite  -transparent black \) \( -clone 0 -channel A -separate +channel \) \
-     \( -clone 1,-1 -compose multiply -composite \) -delete 0,1,2,4 -compose copy-opacity -composite  ${outputPNG}
+     \( -clone 1,-1 -compose multiply -composite \) -delete 0,1,2,4 -compose copy-opacity -composite   png32:${outputPNG}
 
     # Aplicamos la mascara a la imagen del mar
-    ${CONVERT} ${tmpPNG} ${fondomar} -compose multiply -composite -transparent black ${tmpPNG}
+    ${CONVERT} ${tmpPNG} ${fondomar} -compose multiply -composite -transparent black  png32:${tmpPNG}
     fondomar=${tmpPNG}
 fi
 
 
 # Le añadimos una sombra a los continentes
 dims=`${CONVERT} ${outputPNG} -format "%wx%h" info:`
-${CONVERT} ${outputPNG} \( +clone -background gray -shadow 30x3+3+3 -crop ${dims}+0+0 \) +swap -composite ${outputPNG}
+${CONVERT} ${outputPNG} \( +clone -background gray -shadow 30x3+3+3 -crop ${dims}+0+0 \) +swap -composite  png32:${outputPNG}
 
 
 #Global
 if [ ! -z ${global} ] && [  ${global} -eq 1 ]
 then
     # Le metemos el efecto de luz
-    ${COMPOSITE} ${outputPNG} ${TMPDIR}/difu.png  ${outputPNG}
+    ${COMPOSITE} ${outputPNG} ${TMPDIR}/difu.png   png32:${outputPNG}
     # Le metemos un fondo oscuro
     ${CONVERT}   -size ${xsize}x${ysize} xc:"rgb(20,20,20)"  \( ${tmpPNG} -transparent black \) -compose DstOut -composite\
-     -transparent black  ${outputPNG} -compose over  -composite  ${outputPNG}
+     -transparent black  ${outputPNG} -compose over  -composite   png32:${outputPNG}
 fi
 
 
@@ -811,19 +810,19 @@ fi
 cp ${outputPNG} ${outputsmPNG}
 
 # Fronteras en blanco
-${CONVERT} ${outputsmPNG} \( +clone -flatten -negate  \) +swap -composite -threshold 98% -transparent black ${outputbwPNG}
+${CONVERT} ${outputsmPNG} \( +clone -flatten -negate  \) +swap -composite -threshold 98% -transparent black png32:${outputbwPNG}
 
 # Si había región seleccionada solapamos la fronteras de los continenes con la de la región
 if [ ! -z ${cod} ]
 then
-    ${COMPOSITE} ${outputbwPNG} ${fronterasPNG} ${outputbwPNG}
+    ${COMPOSITE} ${outputbwPNG} ${fronterasPNG} png32:${outputbwPNG}
 fi
 
 # Fronteras en negro
-${CONVERT} ${outputbwPNG} -negate ${outputbbPNG}
+${CONVERT} ${outputbwPNG} -negate png32:${outputbbPNG}
 
 # Le añadimos el fondo del mar
-${COMPOSITE} ${outputPNG} ${fondomar} ${outputPNG}
+${COMPOSITE} ${outputPNG} ${fondomar} png32:${outputPNG}
 
 
 if [ ! -z ${global} ] && [  ${global} -eq 1 ]
@@ -832,24 +831,38 @@ then
     # Le aplicamos el efecto de sombra de la tierra para quede más tridimensional
     if [ ! -z ${sombratierra} ] && [  ${sombratierra} -eq 1 ]
     then
+
+        # Si no coincide npulgadas*dpi con el tamaño X o Y de la imagen hay que redimensionar la sombra teniendolo en cuenta
+        xsizereal=`awk -v xlength=${xlength} -v cm2inch=${cm2inch} -v dpi=${dpi} 'BEGIN{printf "%d\n",int(xlength*cm2inch*dpi+0.5)}'`
+#        ysizereal=`awk -v ylength=${ylength} -v cm2inch=${cm2inch} -v dpi=${dpi} 'BEGIN{printf "%d\n",int(ylength*cm2inch*dpi+0.5)}'`
+
+        # Desplazamiento x de la sombra según el xsize calculado antes
+        dx=`awk -v xlength=${xlength} -v cm2inch=${cm2inch} -v dpi=${dpi} -v xsize=${xsize} \
+        'BEGIN{printf "%d\n",int((xsize - xlength*cm2inch*dpi)/2)}'`
+        # Desplazamiento y de la sombra según el xsize calculado antes
+        dy=`awk -v ylength=${ylength} -v cm2inch=${cm2inch} -v dpi=${dpi} -v ysize=${ysize} \
+        'BEGIN{dy=int((ysize - ylength*cm2inch*dpi)/2); printf "%d\n",dy-1}'`
+
         # Tamaño en pixeles que va a tener la sombra
-        sombrasize=`awk -v xlength=${xlength} -v xlengthamp=${xlengthamp} -v xsize=${xsize} 'BEGIN{print int(xlengthamp*xsize/xlength+0.5)}'`
+        sombrasize=`awk -v xlength=${xlength} -v xlengthamp=${xlengthamp} -v xsize=${xsizereal} 'BEGIN{print int(xlengthamp*xsize/xlength+0.5)}'`
         # Pixeles que vamos a recortar a la sombra por arriba
-        dy=`awk -v ysombrasize=${sombrasize} -v ysize=${ysize} -v ydes=${ydesinicial} 'BEGIN{print int((ysombrasize-ysize)/2+0.5)+ydes}'`
+        dy=`awk -v dy=${dy} -v ysombrasize=${sombrasize} -v ysize=${ysize} -v ydes=${ydesinicial} \
+        'BEGIN{print int((ysombrasize-ysize)/2+0.5)+ydes+dy}'`
         # Pixeles que vamos a recortar a la sombra por la izquierda
-        dx=`awk -v xsombrasize=${sombrasize} -v xsize=${xsize} -v xdes=${xdesinicial} 'BEGIN{print int((xsombrasize-xsize)/2+0.5)-xdes}'`
+        dx=`awk -v dx=${dx} -v xsombrasize=${sombrasize} -v xsize=${xsize} -v xdes=${xdesinicial} \
+        'BEGIN{print int((xsombrasize-xsize)/2+0.5)-xdes+dx}'`
         # Si dx o dy es negativo no hay que recortar, hay que desplazar la sombra
         geometry=`awk -v dx=${dx} -v dy=${dy} 'BEGIN{printf "+%d+%d\n",dx<0?-dx:0,dy<0?-dy:0}'`
 
         # Hacemos el redimensionado, el recorte y el desplazamiento para que la sombra cuadre con la posición y tamaño del planeta
         ${CONVERT} -size ${xsize}x${ysize} xc:transparent\
          \( ${filesombra} -resize ${sombrasize} -crop ${xsize}x${ysize}+${dx}+${dy} \)\
-          -geometry ${geometry} -composite ${tmpPNG}
+          -geometry ${geometry} -composite png32:${tmpPNG}
 
         cp ${tmpPNG} ${outputSombraPNG}
 
         # Aplicamos la sombra
-        ${CONVERT} ${tmpPNG} ${outputPNG} -compose multiply -composite ${outputPNG}
+        ${CONVERT} ${tmpPNG} ${outputPNG} -compose multiply -composite png32:${outputPNG}
     fi
 
 fi
@@ -863,7 +876,7 @@ cp -f ${outputPNG} ${outputFinalPNG}
 cp -f ${outputsmPNG} ${outputFinalsmPNG}
 cp -f ${outputbwPNG} ${outputFinalbwPNG}
 cp -f ${outputbbPNG} ${outputFinalbbPNG}
-cp -f ${outputSombraPNG} ${outputFinalSombraPNG}
+if [ -f ${outputSombraPNG} ]; then cp -f ${outputSombraPNG} ${outputFinalSombraPNG}; fi
 
 
 printMessage "¡Se han generado los mapas con exito!"

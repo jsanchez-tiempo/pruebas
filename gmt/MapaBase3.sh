@@ -266,7 +266,7 @@ function writeGeogCFG () {
         # Le aplicamos el efecto de sombra de la tierra para quede más tridimensional
         if [ ! -z ${sombratierra} ] && [  ${sombratierra} -eq 1 ]
         then
-            echo "filesombra=${outputSombraPNG}"
+            echo "filesombra=${outputFinalSombraPNG}"
         fi
 
 
@@ -283,11 +283,11 @@ function writeGeogCFG () {
 
     echo
     echo "### Fondos"
-    echo "fondoPNG=${outputPNG}"
-    echo "fondoPNG=${outputsmPNG}"
-    echo "fronterasPNGw=${outputbwPNG}"
-    echo "fronterasPNGb=${outputbbPNG}"
-    echo "fronterasPNG=${outputbbPNG}"
+    echo "fondoPNG=${outputFinalPNG}"
+    echo "fondoPNG=${outputFinalsmPNG}"
+    echo "fronterasPNGw=${outputFinalbwPNG}"
+    echo "fronterasPNGb=${outputFinalbbPNG}"
+    echo "fronterasPNG=${outputFinalbbPNG}"
     echo
 
     if [ ! -z ${cod} ]

@@ -7,8 +7,10 @@
 
 #source cfg/spain2.cfg
 #source cfg/cvalenciana2.cfg
-source cfg/europa2.cfg
+#source cfg/europa2.cfg
 #source cfg/global2.cfg
+source defaults.cfg
+source cfg/mapa5.cfg
 #source cfg/semiglobalpacifico.cfg
 source funciones.sh
 source funciones-variables.sh
@@ -16,12 +18,14 @@ source variables.sh
 source estilos/meteored2.cfg
 #source estilos/apunt.cfg
 
+ylength=`awk -v xlength=${xlength} -v xsize=${xsize} -v ysize=${ysize} 'BEGIN{printf "%.4f\n",xlength*ysize/xsize}'`
 
 #
 width=`echo ${J} | sed 's/-J.*\/\(.*\)c/\1/'`
 #R="-R-2.96/4.96/37.615/41.06"
 max_age=50
-nparticulas=$((${width}*50))
+#nparticulas=$((${width}*50))
+nparticulas=`awk -v w=${width} -v n=50 'BEGIN{printf "%d",w*n}'`
 fade=7.5
 #scale=200
 scale=400
@@ -37,14 +41,14 @@ awk -v scale=${scale} -f newlatlon.awk | awk '{print $1,$2; print $3,$4}' | gmt 
 
 
 pintarIntensidad=1
-pintarPresion=0
+pintarPresion=1
 
 titulo="Viento en superficie"
 #titulo="VENT SUPERFÍCIE"
 
 min=201809040000
 #max=201808010300
-max=201809052100
+#max=201809052100
 max=201809040300
 #max=201808310300
 
@@ -65,7 +69,7 @@ then
     nframes=$((${slowmotion}*180/${mins}))
 fi
 
-variablefondo="prec"
+variablefondo="uv"
 cargarVariable ${variablefondo}
 
 umbralPREC=0.5
@@ -77,7 +81,7 @@ TMPDIR="/tmp"
 
 OUTPUTS_DIR="/home/juan/Proyectos/pruebas/gmt/OUTPUTS/"
 outputFile="${OUTPUTS_DIR}/viento-meteored2.mkv"
-outputFile="${OUTPUTS_DIR}/vientopruebaeuropa-meteored.mkv"
+outputFile="${OUTPUTS_DIR}/vientopruebaatlantico3-meteored.mkv"
 
 
 # Diretorio temporal
@@ -168,9 +172,9 @@ JGEOG=${J}
 RGEOG=${R}
 
 read w h < <(gmt mapproject ${J} ${R} -W)
-h=14.0625
-J="-JX${w}c/${h}c"
-
+#h=14.0625
+#J="-JX${w}c/${h}c"
+J="-JX${xlength}c/${ylength}c"
 R=`grdinfo ${dataFileUV} -Ir -C` ####
 
 
@@ -220,7 +224,7 @@ then
 #    nminframes=20
 
     printMessage "Calculando máximos/mínimos de MSL desde ${min} hasta ${max}"
-    umbral=0.1
+    umbral=0.2
     # Filtramos los máximos A y lo mínimos B quitando aquellos que aparezcan menos frames de nminframes. Esto evita que aparezcan A y B que aparecen y desaparecen rapidamente
     paste <(awk '{print $1"\t"$2"\t"$3}' ${TMPDIR}/maxmins.txt) <(awk '{print $2,$3,$4,$5}' ${TMPDIR}/maxmins.txt | gmt mapproject ${J} ${R}) > ${TMPDIR}/maxmins2.txt
     awk -v umbral=${umbral} -f filtrarpresion.awk ${TMPDIR}/maxmins2.txt > ${TMPDIR}/maxmins3.txt
@@ -231,7 +235,7 @@ then
     fecha=${min}
     nframe=0
 
-    if [ ! -z ${semiglobal} ] && [  ${semiglobal} -eq 1 ]
+    if [ ! -z ${global} ] && [  ${global} -eq 1 ]
     then
         function pintarPresionAyB {
             pintarPresionAyBGlobal
@@ -240,6 +244,7 @@ then
 
     printMessage "Generando los frames de máximos/mínimos de MSL desde ${min} hasta ${max} cada ${mins} minutos"
 
+#    filelines=0
     # Generamos las capas con los máximos y mínimos
     if [ ${filelines} -gt 0 ]
     then
@@ -252,6 +257,7 @@ then
 
             # Sacamos las dimensiones en cm para la proyección dada
             read w h < <(gmt mapproject ${J} ${R} -W)
+            echo $w $h
             printMessage "Generando frame para fecha ${fecha}"
             pintarPresionAyB
 
@@ -259,6 +265,7 @@ then
             cp ${tmpFile} ${TMPDIR}/mslhl`printf "%03d\n" ${nframe}`.png
 
             nframe=$((${nframe}+1))
+#            exit
 
             fecha=`date -u --date="${fecha:0:8} ${fecha:8:4} +${mins} minutes" +%Y%m%d%H%M`
         done
@@ -281,10 +288,10 @@ read w h < <(gmt mapproject ${JGEOG} ${RGEOG} -W)
 
 ymin=0
 
-if [ ! -z ${semiglobal} ] && [  ${semiglobal} -eq 1 ]
-then
-    ymin=`awk -v h=${h} 'BEGIN{print h-h*0.68}'`
-fi
+#if [ ! -z ${semiglobal} ] && [  ${semiglobal} -eq 1 ]
+#then
+#    ymin=`awk -v h=${h} 'BEGIN{print h-h*0.68}'`
+#fi
 
 
 np=${nparticulas}
@@ -332,9 +339,10 @@ gmt grdcut ${ncFile}?v10 ${Rgeog} -G${ncFileV}
 awk '{print $1,$2}' ${TMPDIR}/particulas.txt | gmt grdtrack -G${ncFileU} -G${ncFileV} | awk -v scale=${scale}  -f newlatlon.awk > ${TMPDIR}/dparticulas.txt
 
 comando="cat"
-if [ ! -z ${semiglobal} ] && [  ${semiglobal} -eq 1 ]
+if [ ! -z ${global} ] && [  ${global} -eq 1 ]
 then
-    comando="gmt mapproject -JX${w}c/${w}c ${RAmp}"
+    comando="gmt mapproject -JX${w}c/${w}c ${RAMP}"
+#    comando="gmt mapproject ${J} ${RAMP}"
 fi
 
 paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulas.txt | gmt mapproject ${RGEOG} ${JGEOG} | ${comando} )\
@@ -381,8 +389,10 @@ do
     ncFileU="${TMPDIR}/${fecha}_u.nc"
     ncFileV="${TMPDIR}/${fecha}_v.nc"
 
-    gmt grdcut ${ncFile}?u10 ${Rgeog} -G${ncFileU}
-    gmt grdcut ${ncFile}?v10 ${Rgeog} -G${ncFileV}
+#    gmt grdcut ${ncFile}?u10 ${Rgeog} -G${ncFileU}
+#    gmt grdcut ${ncFile}?v10 ${Rgeog} -G${ncFileV}
+    ncFileU=${ncFile}?u10
+    ncFileV=${ncFile}?v10
 
     nframesfecha=${nframes}
     if [ ${fecha} -eq ${min} ]
@@ -494,6 +504,8 @@ do
     fecha=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
 done
 
+#exit
+
 nframerotulo=1
 fecha=${min}
 fechamax=${max}
@@ -546,18 +558,19 @@ filtro="[$((${nframerotulo}+${nlogos}+3))]loop=-1[mar];[mar][0]overlay[base];[1]
 #filtro="[1]fade=in:$((${nframesloop}-15)):15[viento];[0][viento]overlay[out];"
 
 
-if [ ! -z ${semiglobal} ] && [  ${semiglobal} -eq 1 ]
+if [ ! -z ${global} ] && [  ${global} -eq 1 ]
 then
-    tmpSombraPNG=${TMPDIR}/sombra.png
-    read w h < <(convert ${filesombra} -format "%w %h" info:)
-    h=`awk -v h=${h} 'BEGIN{printf "%d",h*0.68}'`
-    convert ${filesombra} -crop ${w}x${h}+0+0 ${tmpSombraPNG}
-    filesombra=${tmpSombraPNG}
-    pos="south"
-    hpx=1002
-    convert \( -size 1920x1080 xc:transparent \) \( ${filesombra} -resize 1920x${hpx}\> \) -gravity ${pos} -composite -flatten png32:${tmpSombraPNG}
+#    tmpSombraPNG=${TMPDIR}/sombra.png
+#    read w h < <(convert ${filesombra} -format "%w %h" info:)
+#    h=`awk -v h=${h} 'BEGIN{printf "%d",h*0.68}'`
+#    convert ${filesombra} -crop ${w}x${h}+0+0 ${tmpSombraPNG}
+#    filesombra=${tmpSombraPNG}
+#    pos="south"
+#    hpx=1002
+#    convert \( -size 1920x1080 xc:transparent \) \( ${filesombra} -resize 1920x${hpx}\> \) -gravity ${pos} -composite -flatten png32:${tmpSombraPNG}
+
     filtro="${filtro}[base]setsar=sar=1,format=rgba[base];[$((${nframerotulo}+${nlogos}+${pintarIntensidad}+${pintarPresion}+4))]setsar=sar=1,format=rgba[sombra];[base][sombra]blend=all_mode=multiply:all_opacity=1,format=yuva422p10le[base];"
-    frameSombra=" -f image2 -i ${tmpSombraPNG}"
+    frameSombra=" -f image2 -i ${filesombra}"
 fi
 
 

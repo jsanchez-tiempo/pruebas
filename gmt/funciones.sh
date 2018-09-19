@@ -1,27 +1,112 @@
 #!/bin/bash
 
 
+#function RGeog {
+#
+#    proy=`echo ${J} | sed -n 's/\-J\(.\).*/\1/p'`
+#    if [ ${R} != "-Rd" ] && ( [ ${proy} == "G" ] || [ ${proy} == "S" ] )
+#    then
+#        #Ampliamos R para que al pintar el mapa de la variable no se vea recortado por la proyección geográfica
+#        w=`gmt mapproject ${J} ${R} -W | awk '{printf "%f",$1}'`
+#        h=`gmt mapproject ${J} ${R} -W | awk '{printf "%f",$2}'`
+#        lonmin=`echo 0 ${h} | gmt mapproject -J -R -I | awk '{printf "%.1f",$1}'`
+#        lonmed=`echo ${J} | sed -n 's/\-J[GSQ]\(.*\)c/\1/p' | awk -F "/" '{printf "%.1f",$3/2}'`
+#        latmax=`echo ${lonmed} ${h} | gmt mapproject -J -R -I | awk '{printf "%.1f",$2+0.5}'`
+#
+#        latmin1=`echo 0 0 | gmt mapproject -J -R -I | awk '{printf "%.1f",$2-0.5}'`
+#        latmin2=`echo ${w} 0 | gmt mapproject -J -R -I | awk '{printf "%.1f",$2-0.5}'`
+#        latmin=`awk -v latmin1=${latmin1} -v latmin2=${latmin2} 'BEGIN{print latmin1<latmin2?latmin1:latmin2}'`
+#
+#        Rgeog=`echo ${R} | sed -n 's/\-R\(.*\)+r/\1/p' | awk -F "/" -v lonmin=${lonmin} -v latmax=${latmax} -v latmin=${latmin} '{printf "-R%s/%s/%s/%s+r",lonmin,latmin,$3,latmax}'`
+#    else
+#        Rgeog=${R}
+#    fi
+#}
+
 function RGeog {
+
+    local R=$1
+    local J=$2
+
 
     proy=`echo ${J} | sed -n 's/\-J\(.\).*/\1/p'`
     if [ ${R} != "-Rd" ] && ( [ ${proy} == "G" ] || [ ${proy} == "S" ] )
     then
-        #Ampliamos R para que al pintar el mapa de la variable no se vea recortado por la proyección geográfica
+
+
+
+        #Ampliamos R para que al pintar el mapa de la variable no se vea recortado por la proyección ortográfica
         w=`gmt mapproject ${J} ${R} -W | awk '{printf "%f",$1}'`
         h=`gmt mapproject ${J} ${R} -W | awk '{printf "%f",$2}'`
-        lonmin=`echo 0 ${h} | gmt mapproject -J -R -I | awk '{printf "%.1f",$1}'`
-        lonmed=`echo ${J} | sed -n 's/\-J[GSQ]\(.*\)c/\1/p' | awk -F "/" '{printf "%.1f",$3/2}'`
-        latmax=`echo ${lonmed} ${h} | gmt mapproject -J -R -I | awk '{printf "%.1f",$2+0.5}'`
+        lonmin1=`echo 0 ${h} | gmt mapproject ${J} ${R} -I | awk '{printf "%.1f",($1<0?$1+360:$1)-0.5}'`
+        lonmin2=`echo 0 0 | gmt mapproject ${J} ${R} -I | awk '{printf "%.1f",($1<0?$1+360:$1)-0.5}'`
 
-        latmin1=`echo 0 0 | gmt mapproject -J -R -I | awk '{printf "%.1f",$2-0.5}'`
-        latmin2=`echo ${w} 0 | gmt mapproject -J -R -I | awk '{printf "%.1f",$2-0.5}'`
-        latmin=`awk -v latmin1=${latmin1} -v latmin2=${latmin2} 'BEGIN{print latmin1<latmin2?latmin1:latmin2}'`
+        if (( `echo "${lonmin1} < ${lonmin2}" | bc -l` ))
+        then
+            lonmin=${lonmin1}
+        else
+            lonmin=${lonmin2}
+        fi
 
-        Rgeog=`echo ${R} | sed -n 's/\-R\(.*\)+r/\1/p' | awk -F "/" -v lonmin=${lonmin} -v latmax=${latmax} -v latmin=${latmin} '{printf "-R%s/%s/%s/%s+r",lonmin,latmin,$3,latmax}'`
+
+
+        lonmax1=`echo ${w} ${h} | gmt mapproject ${J} ${R} -I | awk '{printf "%.1f",($1<0?$1+360:$1)+0.5}'`
+        lonmax2=`echo ${w} 0 | gmt mapproject ${J} ${R} -I | awk '{printf "%.1f",($1<0?$1+360:$1)+0.5}'`
+
+        if (( `echo "${lonmax1} > ${lonmax2}" | bc -l` ))
+        then
+            lonmax=${lonmax1}
+        else
+            lonmax=${lonmax2}
+        fi
+
+
+        lonmed=`awk -v w=${w} 'BEGIN{printf "%.2f",w/2}'`
+
+        latmin1=`echo 0 0 | gmt mapproject ${J} ${R} -I | awk '{printf "%.1f",$2-0.5}'`
+        latmin2=`echo ${lonmed} 0 | gmt mapproject ${J} ${R} -I | awk '{printf "%.1f",$2-0.5}'`
+        latmin3=`echo ${w} 0 | gmt mapproject ${J} ${R} -I | awk '{printf "%.1f",$2-0.5}'`
+
+        if (( `echo "${latmin1} < ${latmin2}" | bc -l` )) && (( `echo "${latmin1} < ${latmin3}" | bc -l` ))
+        then
+            latmin=${latmin1}
+        elif (( `echo "${latmin2} < ${latmin3}" | bc -l` ))
+        then
+            latmin=${latmin2}
+        else
+            latmin=${latmin3}
+        fi
+
+        if (( `echo "${latmin1} < -90" | bc -l` ))
+        then
+            latmin=-90
+        fi
+
+
+        latmax1=`echo 0 ${h} | gmt mapproject ${J} ${R} -I | awk '{printf "%.1f",$2+0.5}'`
+        latmax2=`echo ${lonmed} ${h} | gmt mapproject ${J} ${R} -I | awk '{printf "%.1f",$2+0.5}'`
+        latmax3=`echo ${w} ${h} | gmt mapproject ${J} ${R} -I | awk '{printf "%.1f",$2+0.5}'`
+
+        if (( `echo "${latmax1} > ${latmax2}" | bc -l` )) && (( `echo "${latmax1} < ${latmax3}" | bc -l` ))
+        then
+            latmax=${latmax1}
+        elif (( `echo "${latmax2} > ${latmax3}" | bc -l` ))
+        then
+            latmax=${latmax2}
+        else
+            latmax=${latmax3}
+        fi
+
+        Rgeog="-R${lonmin}/${lonmax}/${latmin}/${latmax}"
+        echo $Rgeog
+
     else
         Rgeog=${R}
     fi
 }
+
+
+
 
 
 function printMessage {
@@ -56,7 +141,7 @@ function procesarGrids {
         printMessage "Procesando grids ${fecha}"
 
 
-        RGeog
+        RGeog ${R} ${J}
 
         dataFileDST=${TMPDIR}/${fecha}_${vardst}.nc
 
@@ -72,22 +157,30 @@ function procesarGrids {
 
         gmt grdproject ${dataFileDST} ${R} ${J} -G${dataFileDST}
 
-        if [ ! -z ${semiglobal} ] && [  ${semiglobal} -eq 1 ]
+        if [ ! -z ${global} ] && [  ${global} -eq 1 ]
         then
-            read w h < <(gmt mapproject ${J} ${R} -W)
-#            echo $w $h
-            grdcut -R0/${w}/`awk -v w=${w} 'BEGIN{printf "%.4f\n",w-w*0.68}'`/${w} ${dataFileDST} -G${dataFileDST}
-#            RAmp=`awk -v w=${w} 'BEGIN{a=(920/1080*w)/2; b=(920/1920*w)/2; printf "-R%.4f/%.4f/%.4f/%.4f\n",-b,w+b,-a,w+a}'`
-            RAmp=`awk -v w=${w} 'BEGIN{h=w*0.68; a=1080*h/1000-h; b=(1920*w/(1000/0.68)-w)/2; printf "-R%.4f/%.4f/%.4f/%.4f\n",-b,w+b,w-w*0.68,w+a}'`
-            hsemi=`awk -v h=${h} 'BEGIN{print h*0.68}'`
+#            read w h < <(gmt mapproject ${J} ${R} -W)
 
-            echo $RAmp
+#            ylength=`awk -v xlength=${xlength} -v xsize=${xsize} -v ysize=${ysize} 'BEGIN{printf "%.4f\n",xlength*ysize/xsize}'`
 
-            gmt grdproject -JX${w}c/${hsemi}c ${RAmp} ${dataFileDST} -G${dataFileDST}
-#            gmt grdedit ${dataFileDST} -R0/${w}/`awk -v h=${h} -v hsemi=${hsemi} 'BEGIN{print h-hsemi}'`/${h}
+            gmt grdcut ${dataFileDST} ${RAMP} -G${dataFileDST}   # 275/1080×14,0625=3.5807; 3.5807+2.4688=6.0495; 16.5313+2.4688=20.112
+            gmt grdproject ${dataFileDST} -JX${xlength}/${ylength} ${RAMP} -G${dataFileDST} #
 
 
+
+##            echo $w $h
 #            grdcut -R0/${w}/`awk -v w=${w} 'BEGIN{printf "%.4f\n",w-w*0.68}'`/${w} ${dataFileDST} -G${dataFileDST}
+##            RAmp=`awk -v w=${w} 'BEGIN{a=(920/1080*w)/2; b=(920/1920*w)/2; printf "-R%.4f/%.4f/%.4f/%.4f\n",-b,w+b,-a,w+a}'`
+#            RAmp=`awk -v w=${w} 'BEGIN{h=w*0.68; a=1080*h/1000-h; b=(1920*w/(1000/0.68)-w)/2; printf "-R%.4f/%.4f/%.4f/%.4f\n",-b,w+b,w-w*0.68,w+a}'`
+#            hsemi=`awk -v h=${h} 'BEGIN{print h*0.68}'`
+#
+#            echo $RAmp
+#
+#            gmt grdproject -JX${w}c/${hsemi}c ${RAmp} ${dataFileDST} -G${dataFileDST}
+##            gmt grdedit ${dataFileDST} -R0/${w}/`awk -v h=${h} -v hsemi=${hsemi} 'BEGIN{print h-hsemi}'`/${h}
+#
+#
+##            grdcut -R0/${w}/`awk -v w=${w} 'BEGIN{printf "%.4f\n",w-w*0.68}'`/${w} ${dataFileDST} -G${dataFileDST}
         fi
 
         read zminlocal zmaxlocal < <(gmt grdinfo ${dataFileDST} -C | awk '{printf "%.0f %.0f\n",$6-0.5,$7+0.5}')
@@ -196,20 +289,19 @@ function interpolarFrames {
     #    read w h < <(gmt mapproject ${J} ${R} -W)
     #    h=14.0625
     #    J="-JX${w}c/${h}c"
-        gmt psbasemap ${R} ${J} -B+n --PS_MEDIA="${w}cx${h}c" -Xc -Yc --MAP_FRAME_PEN="0p,black" -P -K > ${tmpFile}
+        gmt psbasemap ${R} ${J}  -B+n --PS_MEDIA="${xlength}cx${ylength}c" -Xc -Yc --MAP_FRAME_PEN="0p,black" -P -K > ${tmpFile}
 
         printMessage "Generando frame para fecha ${ti}"
 
         pintarVariable ${tfile}
 
         gmt psbasemap -J -R -B+n -O >> ${tmpFile}
-        gmt psconvert ${tmpFile} -P -TG -Qg1 -Qt4
+        gmt psconvert ${tmpFile}  -P -TG -Qg1 -Qt4
 
         inputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`.png
         outputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`-fhd.png
 
-        convert -resize 1920x1080!  ${inputpng} png32:${outputpng}
-
+        convert -resize ${xsize}x${ysize}!  ${inputpng} png32:${outputpng}
 
 
         cp ${outputpng} ${TMPDIR}/${var}`printf "%03d\n" ${nframe}`.png
@@ -241,20 +333,21 @@ function interpolarFrames {
 
 
             # Sacamos las dimensiones en cm para la proyección dada
-            read w h < <(gmt mapproject ${J} ${R} -W)
-            gmt psbasemap ${R} ${J}  -B+n --PS_MEDIA="${w}cx${h}c" -Xc -Yc --MAP_FRAME_PEN="0p,black" -P -K > ${tmpFile}
+#            read w h < <(gmt mapproject ${J} ${R} -W)
+            gmt psbasemap ${R} ${J}  -B+n --PS_MEDIA="${xlength}cx${ylength}c" -Xc -Yc --MAP_FRAME_PEN="0p,black" -P -K > ${tmpFile}
 
             printMessage "Generando frame para fecha ${fecha}"
 
             pintarVariable ${tfile}
 
             gmt psbasemap -J -R -B+n -O >> ${tmpFile}
-            gmt psconvert ${tmpFile} -P -TG -Qg1 -Qt4 -E192
+            gmt psconvert ${tmpFile}  -P -TG -Qg1 -Qt4
 
             inputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`.png
             outputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`-fhd.png
 
-            convert -resize 1920x1080!  ${inputpng} png32:${outputpng}
+            convert -resize ${xsize}x${ysize}!  ${inputpng} png32:${outputpng}
+
 
             cp ${outputpng} ${TMPDIR}/${var}`printf "%03d\n" ${nframe}`.png
 
@@ -273,22 +366,23 @@ function interpolarFrames {
 
     # Sacamos las dimensiones en cm para la proyección dada
     read w h < <(gmt mapproject ${J} ${R} -W)
-    gmt psbasemap ${R} ${J}  -B+n --PS_MEDIA="${w}cx${h}c" -Xc -Yc --MAP_FRAME_PEN="0p,black" -P -K > ${tmpFile}
+    gmt psbasemap ${R} ${J} -B+n --PS_MEDIA="${xlength}cx${ylength}c" -Xc -Yc --MAP_FRAME_PEN="0p,black" -P -K > ${tmpFile}
 
     printMessage "Generando frame para fecha ${fecha}"
 
     pintarVariable ${tfile}
 
     gmt psbasemap -J -R -B+n -O >> ${tmpFile}
-    gmt psconvert ${tmpFile} -P -TG -Qg1 -Qt4
+    gmt psconvert ${tmpFile}  -P -TG -Qg1 -Qt4
 
     inputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`.png
     outputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`-fhd.png
 
-    convert -resize 1920x1080!  ${inputpng} png32:${outputpng}
+    convert -resize ${xsize}x${ysize}!  ${inputpng} png32:${outputpng}
 
 
     cp ${outputpng} ${TMPDIR}/${var}`printf "%03d\n" ${nframe}`.png
+
 
 
 

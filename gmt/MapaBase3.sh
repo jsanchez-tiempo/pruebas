@@ -605,8 +605,8 @@ JAMP="-JG${lon}/${lat}/${xlengthamp}c"
 # Con la nueva J cogemos un rectángulo centrado en el centro de la proyección y de ancho y alto los w y h originales.
 # Calculamos la longitud y latitud de la esquina inferior izquierda y de la esquina superior derecha que nos servirá
 # para obtener la R
-read lonmin latmin < <(awk -v w=${xlength} -v h=${ylength} -v wamp=${xlengthamp} 'BEGIN{x=y=wamp/2; printf "%.4f %.4f\n",x-w/2,y-h/2}' | ${GMT} mapproject -Rd ${JAMP} -I)
-read lonmax latmax < <(awk -v w=${xlength} -v h=${ylength} -v wamp=${xlengthamp} 'BEGIN{x=y=wamp/2; printf "%.4f %.4f\n",x+w/2,y+h/2}' | ${GMT} mapproject -Rd ${JAMP} -I)
+read lonmin latmin < <(awk -v w=${xlength} -v h=${ylength} -v wamp=${xlengthamp} 'BEGIN{x=y=wamp/2; printf "%.8f %.8f\n",x-w/2,y-h/2}' | ${GMT} mapproject -Rd ${JAMP} -I)
+read lonmax latmax < <(awk -v w=${xlength} -v h=${ylength} -v wamp=${xlengthamp} 'BEGIN{x=y=wamp/2; printf "%.8f %.8f\n",x+w/2,y+h/2}' | ${GMT} mapproject -Rd ${JAMP} -I)
 
 
 if [ -z ${GLOBEFILE} ]
@@ -855,7 +855,7 @@ then
         geometry=`awk -v dx=${dx} -v dy=${dy} 'BEGIN{printf "+%d+%d\n",dx<0?-dx:0,dy<0?-dy:0}'`
 
         # Hacemos el redimensionado, el recorte y el desplazamiento para que la sombra cuadre con la posición y tamaño del planeta
-        ${CONVERT} -size ${xsize}x${ysize} xc:transparent\
+        ${CONVERT} -size ${xsize}x${ysize} xc:white\
          \( ${filesombra} -resize ${sombrasize} -crop ${xsize}x${ysize}+${dx}+${dy} \)\
           -geometry ${geometry} -composite png32:${tmpPNG}
 

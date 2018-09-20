@@ -17,6 +17,7 @@ function cargarVariable {
     unidadEscala=${variables[${var},unidad]}
     esprecipitacion=${variables[${var},isprec]}
     esprecacum=${variables[${var},isprecacum]}
+    estransparente=${variables[${var},istransparent]}
 
 }
 
@@ -278,12 +279,28 @@ function procesarPresion {
 
 
 
+function procesarNubes {
+
+    gmt grdconvert -Rd ${TMPDIR}/${fecha}.nc\?tcc ${dataFileDST} 2>> ${errorsFile}
+    gmt grdcut ${Rgeog} ${dataFileDST}  -G${dataFileDST} 2>> ${errorsFile}
+
+}
+
+function pintarNubes {
+
+    dataFile=$1
+    gmt grdimage ${dataFile} ${J} ${R} ${X} ${Y} -Q -C${cptGMT} -nc+c -E${dpi} -K -O >> ${tmpFile}
+
+}
+
 ######### PRECIPITACIÓN
 
 function procesarPREC {
 
-    variables="cp lsp"
+#    variables="cp lsp"
 
+    variables=$1
+    echo ${variables}
 #    dataFileDST=`dirname ${ncFile}`/`basename ${ncFile} .nc`_acumprec.nc
 
     for variable in ${variables}
@@ -310,8 +327,10 @@ function procesarPREC {
 
 function procesarTasaPREC {
 
-    variables="crr lsrr csfr lssfr"
 
+#    variables="crr lsrr csfr lssfr"
+    variables=$1
+    echo ${variables}
 #    dataFileDST=`dirname ${ncFile}`/`basename ${ncFile} .nc`_acumprec.nc
 
     for variable in ${variables}
@@ -337,6 +356,25 @@ function procesarTasaPREC {
 
 }
 
+function procesarNieve {
+    variables="sf"
+    procesarPREC "${variables}"
+}
+
+function procesarTasaNieve {
+    variables="csfr lssfr"
+    procesarTasaPREC "${variables}"
+}
+
+function procesarLluvia {
+    variables="cp lsp"
+    procesarPREC "${variables}"
+}
+
+function procesarTasaLluvia {
+    variables="crr lsrr csfr lssfr"
+    procesarTasaPREC "${variables}"
+}
 
 function pintarPREC {
 

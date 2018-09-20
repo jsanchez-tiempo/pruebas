@@ -183,6 +183,36 @@ function procesarGrids {
 ##            grdcut -R0/${w}/`awk -v w=${w} 'BEGIN{printf "%.4f\n",w-w*0.68}'`/${w} ${dataFileDST} -G${dataFileDST}
         fi
 
+#        read zminlocal zmaxlocal < <(gmt grdinfo ${dataFileDST} -C | awk '{printf "%.0f %.0f\n",$6-0.5,$7+0.5}')
+#        if [ ${zminlocal} -lt ${zmin} ]
+#        then
+#            zmin=${zminlocal}
+#        fi
+#        if [ ${zmaxlocal} -gt ${zmax} ]
+#        then
+#            zmax=${zmaxlocal}
+#        fi
+
+        fecha=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
+
+    done
+
+
+
+}
+
+function calcularMinMax {
+
+    local vardst=$1
+    local fecha=$2  #min
+    local fechamax=$3  #max
+    local step=$4
+
+    while [ ${fecha} -le ${fechamax} ]
+    do
+
+        dataFileDST=${TMPDIR}/${fecha}_${vardst}.nc
+
         read zminlocal zmaxlocal < <(gmt grdinfo ${dataFileDST} -C | awk '{printf "%.0f %.0f\n",$6-0.5,$7+0.5}')
         if [ ${zminlocal} -lt ${zmin} ]
         then
@@ -198,7 +228,25 @@ function procesarGrids {
     done
 
 
+}
 
+
+function generarFrame {
+            gmt psbasemap ${R} ${J}  -B+n --PS_MEDIA="${xlength}cx${ylength}c" -Xc -Yc --MAP_FRAME_PEN="0p,black" -P -K > ${tmpFile}
+
+            printMessage "Generando frame para fecha ${ti}"
+
+            pintarVariable ${tfile}
+
+            gmt psbasemap -J -R -B+n -O >> ${tmpFile}
+            gmt psconvert ${tmpFile}  -P -TG -Qg1 -Qt4
+
+            inputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`.png
+            outputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`-fhd.png
+
+            convert -resize ${xsize}x${ysize}!  ${inputpng} png32:${outputpng}
+
+            cp ${outputpng} ${TMPDIR}/${var}`printf "%03d\n" ${nframe}`.png
 }
 
 
@@ -279,34 +327,16 @@ function interpolarFrames {
         A2="${TMPDIR}/a2.nc"
 
 
-
         fecha=`date -u --date="${ti:0:8} ${ti:8:2}" +%Y%m%d%H%M`
         tfile=${TMPDIR}/${fecha}_${var}.nc
 
         tmpFile="${TMPDIR}/${fecha}-${var}.ps"
 
-        # Sacamos las dimensiones en cm para la proyección dada
-    #    read w h < <(gmt mapproject ${J} ${R} -W)
-    #    h=14.0625
-    #    J="-JX${w}c/${h}c"
-        gmt psbasemap ${R} ${J}  -B+n --PS_MEDIA="${xlength}cx${ylength}c" -Xc -Yc --MAP_FRAME_PEN="0p,black" -P -K > ${tmpFile}
-
-        printMessage "Generando frame para fecha ${ti}"
-
-        pintarVariable ${tfile}
-
-        gmt psbasemap -J -R -B+n -O >> ${tmpFile}
-        gmt psconvert ${tmpFile}  -P -TG -Qg1 -Qt4
-
-        inputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`.png
-        outputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`-fhd.png
-
-        convert -resize ${xsize}x${ysize}!  ${inputpng} png32:${outputpng}
-
-
-        cp ${outputpng} ${TMPDIR}/${var}`printf "%03d\n" ${nframe}`.png
-        nframe=$((${nframe}+1))
-
+        if [ ${fecha} -ge ${minreal} ]
+        then
+            generarFrame
+            nframe=$((${nframe}+1))
+        fi
 
 
         # Obtenemos los netcdf intermedios haciendo la interpolación cada mins minutos
@@ -332,26 +362,11 @@ function interpolarFrames {
             gmt grdmath ${A_1} ${A0} ${t} MUL ADD ${A1} ${t} 2 POW MUL ADD ${A2} ${t} 3 POW MUL ADD 2 DIV = ${tfile}
 
 
-            # Sacamos las dimensiones en cm para la proyección dada
-#            read w h < <(gmt mapproject ${J} ${R} -W)
-            gmt psbasemap ${R} ${J}  -B+n --PS_MEDIA="${xlength}cx${ylength}c" -Xc -Yc --MAP_FRAME_PEN="0p,black" -P -K > ${tmpFile}
-
-            printMessage "Generando frame para fecha ${fecha}"
-
-            pintarVariable ${tfile}
-
-            gmt psbasemap -J -R -B+n -O >> ${tmpFile}
-            gmt psconvert ${tmpFile}  -P -TG -Qg1 -Qt4
-
-            inputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`.png
-            outputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`-fhd.png
-
-            convert -resize ${xsize}x${ysize}!  ${inputpng} png32:${outputpng}
-
-
-            cp ${outputpng} ${TMPDIR}/${var}`printf "%03d\n" ${nframe}`.png
-
-            nframe=$((${nframe}+1))
+            if [ ${fecha} -ge ${minreal} ]
+            then
+                generarFrame
+                nframe=$((${nframe}+1))
+            fi
         done
 
         ti=`date -u --date="${ti:0:8} ${ti:8:2} +${step} hours" +%Y%m%d%H%M`
@@ -364,27 +379,31 @@ function interpolarFrames {
 
     tmpFile="${TMPDIR}/${fecha}-${var}.ps"
 
-    # Sacamos las dimensiones en cm para la proyección dada
-    read w h < <(gmt mapproject ${J} ${R} -W)
-    gmt psbasemap ${R} ${J} -B+n --PS_MEDIA="${xlength}cx${ylength}c" -Xc -Yc --MAP_FRAME_PEN="0p,black" -P -K > ${tmpFile}
-
-    printMessage "Generando frame para fecha ${fecha}"
-
-    pintarVariable ${tfile}
-
-    gmt psbasemap -J -R -B+n -O >> ${tmpFile}
-    gmt psconvert ${tmpFile}  -P -TG -Qg1 -Qt4
-
-    inputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`.png
-    outputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`-fhd.png
-
-    convert -resize ${xsize}x${ysize}!  ${inputpng} png32:${outputpng}
-
-
-    cp ${outputpng} ${TMPDIR}/${var}`printf "%03d\n" ${nframe}`.png
+    if [ ${fecha} -ge ${minreal} ]
+    then
+        generarFrame
+        nframe=$((${nframe}+1))
+    fi
 
 
 
+
+}
+
+
+function black2transparentFrames {
+
+    local var=$1
+    printMessage "Convirtiendo canal gris a canal alfa"
+    nframe=0
+    file="${TMPDIR}/${var}`printf "%03d\n" ${nframe}`.png"
+    while [ -f ${file} ]
+    do
+        convert -size ${xsize}x${ysize} xc:white \( ${file} -channel R -separate +channel \) \
+         -compose copy-opacity -composite png32:${file}
+         nframe=$((${nframe}+1))
+         file="${TMPDIR}/${var}`printf "%03d\n" ${nframe}`.png"
+    done
 
 }
 
@@ -401,13 +420,14 @@ function replicarFrames {
     fi
 
     nframesintermedios=$((${slowmotion}*180/${mins}))
-    filtro="loop=$(( ${nframes}+${nframesloop}-1 )):1:0"
+    nframesintermediosinicio=$((${slowmotion}*180/${mins}-${desfasemin}*${slowmotion}*60/${mins}))
+    filtro="loop=$(( ${nframesinicio}+${nframesloop}-${slowmotion} )):1:0"
 
     fecha=${min}
-    i=1
+    i=0
     while [ ${fecha} -lt ${max} ]
     do
-        filtro="loop=$(( ${nframes}-${nframesintermedios} )):1:$((${nframesintermedios}*${i}))[out];[out]${filtro}"
+        filtro="loop=$(( ${nframes}-${nframesintermedios} )):1:$((${nframesintermediosinicio}+${nframesintermedios}*${i}))[out];[out]${filtro}"
         fecha=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
         i=$((${i}+1))
     done
@@ -422,6 +442,9 @@ function replicarFrames {
 #        vsyncoption="-vsync 0"
 #    fi
 
+    echo ${filtro}
+#    exit
+
     ffmpeg -f image2 -i ${TMPDIR}/${var}%03d.png -filter_complex "${filtro}" -vsync 0 ${TMPDIR}/kk%03d.png
 
     rm -rf ${TMPDIR}/${var}*.png
@@ -431,12 +454,15 @@ function replicarFrames {
 function interpolarPREC {
 
 
-
-    cp ${TMPDIR}/${min}_acumprec.nc ${TMPDIR}/${min}_prec.nc
+#    local vardst=$1
+#    cp ${TMPDIR}/${min}_acumprec.nc ${TMPDIR}/${min}_prec.nc
 
     fecha=`date -u --date="${min:0:8} ${min:8:2} +3 hours" +%Y%m%d%H%M`
     nframe=0
 
+    local ratevar=${variablesprocesar[0]}
+    local acumvar=${variablesprocesar[1]}
+    local vardst=$1
 
     #printMessage "Interpolando grids de PREC desde ${min} hasta ${max} cada ${mins} minutos"
     printMessage "Interpolando grids de PREC desde ${min} hasta ${max} cada 60 minutos"
@@ -446,16 +472,16 @@ function interpolarPREC {
 
         fechaAnt=`date -u --date="${fecha:0:8} ${fecha:8:2} -3 hours" +%Y%m%d%H%M`
 
-        acumFile=${TMPDIR}/${fecha}_acumprec.nc
-        acumFileAnt=${TMPDIR}/${fechaAnt}_acumprec.nc
+        acumFile=${TMPDIR}/${fecha}_${acumvar}.nc
+        acumFileAnt=${TMPDIR}/${fechaAnt}_${acumvar}.nc
 
-        rateFile=${TMPDIR}/${fecha}_rateprec.nc
-        rateFileAnt=${TMPDIR}/${fechaAnt}_rateprec.nc
+        rateFile=${TMPDIR}/${fecha}_${ratevar}.nc
+        rateFileAnt=${TMPDIR}/${fechaAnt}_${ratevar}.nc
 
         fecha05=`date -u --date="${fechaAnt:0:8} ${fechaAnt:8:2} +1800 secs" +%Y%m%d%H%M`
         fecha25=`date -u --date="${fecha:0:8} ${fecha:8:2} -1800 secs" +%Y%m%d%H%M`
-        acumFile05=${TMPDIR}/${fecha05}_acumprec.nc
-        acumFile25=${TMPDIR}/${fecha25}_acumprec.nc
+        acumFile05=${TMPDIR}/${fecha05}_${acumvar}.nc
+        acumFile25=${TMPDIR}/${fecha25}_${acumvar}.nc
 
         gmt grdmath ${acumFileAnt} ${rateFileAnt} 1800 MUL ADD = ${acumFile05}
         gmt grdclip -Sb0/0 ${acumFile05} -G${acumFile05}
@@ -503,7 +529,7 @@ function interpolarPREC {
 
             printMessage "Interpolando grid ${fechai}"
 
-            acumFilei=${TMPDIR}/${fechai}_acumprec.nc
+            acumFilei=${TMPDIR}/${fechai}_${acumvar}.nc
 
             if [ ! -f ${acumFilei} ]
             then
@@ -512,7 +538,7 @@ function interpolarPREC {
 
             if [ ${esprecacum} -eq 0 ]
             then
-                gmt grdmath ${acumFilei} ${fileAnt} SUB = ${TMPDIR}/${fechai}_prec.nc
+                gmt grdmath ${acumFilei} ${fileAnt} SUB = ${TMPDIR}/${fechai}_${vardst}.nc
                 fileAnt=${acumFilei}
             fi
 
@@ -520,12 +546,17 @@ function interpolarPREC {
 
         if [ ${esprecacum} -eq 0 ]
         then
-            gmt grdmath ${acumFile} ${fileAnt} SUB = ${TMPDIR}/${fecha}_prec.nc
+            gmt grdmath ${acumFile} ${fileAnt} SUB = ${TMPDIR}/${fecha}_${vardst}.nc
         fi
 
         fecha=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
     done
 
+    if [ ${esprecacum} -eq 0 ] # && [ ${fechapasada} -eq ${min} ]
+    then
+        fecha=`date -u --date="${min:0:8} ${min:8:2} +1 hours" +%Y%m%d%H%M`
+        cp ${TMPDIR}/${fecha}_${vardst}.nc ${TMPDIR}/${min}_${vardst}.nc
+    fi
 
 
 

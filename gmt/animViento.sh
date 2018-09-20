@@ -10,7 +10,7 @@
 #source cfg/europa2.cfg
 #source cfg/global2.cfg
 source defaults.cfg
-source cfg/mapa5.cfg
+source cfg/mapa2.cfg
 #source cfg/semiglobalpacifico.cfg
 source funciones.sh
 source funciones-variables.sh
@@ -41,16 +41,35 @@ awk -v scale=${scale} -f newlatlon.awk | awk '{print $1,$2; print $3,$4}' | gmt 
 
 
 pintarIntensidad=1
-pintarPresion=1
+pintarPresion=0
 
 titulo="Viento en superficie"
 #titulo="VENT SUPERFÍCIE"
 
-min=201809040000
+variablefondo="nubes"
+cargarVariable ${variablefondo}
+
+fechapasada=201803150000
+
+min=201803150000
 #max=201808010300
 #max=201809052100
-max=201809040300
+max=201803150600
 #max=201808310300
+
+# Si es precipitación prevista y corresponde al dato de un paso de tiempo (múltiplo de 3)
+if [ ${esprecipitacion} -eq 1 ] && [ ${esprecacum} -eq 0 ] && [ $(( $(echo ${min:8:2}| awk '{print int($0)}')%3 )) -eq 0 ]
+then
+    min=`date -u --date="${min:0:8} ${min:8:2} +1 hours" +%Y%m%d%H%M`
+fi
+
+
+minreal=${min}
+min=${minreal:0:8}`printf "%02d" $(( $(echo ${min:8:2}|awk '{print int($0)}')/3*3 ))`00
+desfasemin=$((${minreal:0:10}-${min:0:10}))
+
+#fronterasPNG=${fronterasPNGw}
+
 
 mins=30
 #mins=60
@@ -60,17 +79,25 @@ stepviento=3
 steprotulo=1
 
 slowmotion=2
+#slowmotion=10
 nframes=20
 nframes=1
 #ncFile="2018031515.nc"
+nframesinicio=${nframes}
+
+if [ ${nframesinicio} -lt $((${slowmotion}*180/${mins}-${desfasemin}*${slowmotion}*60/${mins})) ]
+then
+    nframesinicio=$((${slowmotion}*180/${mins}-${desfasemin}*${slowmotion}*60/${mins}))
+fi
 
 if [ ${nframes} -lt $((${slowmotion}*180/${mins})) ]
 then
     nframes=$((${slowmotion}*180/${mins}))
 fi
 
-variablefondo="uv"
-cargarVariable ${variablefondo}
+echo ${nframes} ${nframesinicio}
+
+
 
 umbralPREC=0.5
 TMPDIR="/tmp"
@@ -81,7 +108,7 @@ TMPDIR="/tmp"
 
 OUTPUTS_DIR="/home/juan/Proyectos/pruebas/gmt/OUTPUTS/"
 outputFile="${OUTPUTS_DIR}/viento-meteored2.mkv"
-outputFile="${OUTPUTS_DIR}/vientopruebaatlantico3-meteored.mkv"
+outputFile="${OUTPUTS_DIR}/vientopruebaan-meteored.mkv"
 
 
 # Diretorio temporal
@@ -119,7 +146,7 @@ printMessage "Procesando los grids de Viento (U y V) desde ${fecha} hasta ${fech
 
 variable=${variablefondo}
 nvar=0
-echo ${variablesprocesar[*]}
+#echo ${variablesprocesar[*]}
 for funcion in ${funcionesprocesar}
 do
     echo ${nvar}
@@ -140,9 +167,9 @@ done
 
 dataFileUV=${dataFileDST}
 
-printMessage "Generando Escala a partir de ${zmin}/${zmax} con fichero CPT ${cptGMT}"
-
-./crearescala.sh ${zmin}/${zmax} ${cptGMT} ${TMPDIR}/escala.png  ${unidadEscala} #2>> ${errorsFile}
+#printMessage "Generando Escala a partir de ${zmin}/${zmax} con fichero CPT ${cptGMT}"
+#
+#./crearescala.sh ${zmin}/${zmax} ${cptGMT} ${TMPDIR}/escala.png  ${unidadEscala} #2>> ${errorsFile}
 
 
 
@@ -186,7 +213,7 @@ then
     if [ ${esprecipitacion} -eq 1 ]
     then
 
-        interpolarPREC ${min} ${max}
+        interpolarPREC ${variablefondo} ${min} ${max}
         stepinterp=1
 
 #        if [ ${esprecacum} -eq 0 ] ##################
@@ -198,7 +225,14 @@ then
     fi
 
     interpolarFrames "${variablefondo}" ${min} ${max} ${mins} ${stepinterp}
+    if [ ${estransparente} -eq 1 ]
+    then
+        black2transparentFrames "${variablefondo}"
+    fi
     replicarFrames "${variablefondo}"
+    calcularMinMax "${variablefondo}" ${min} ${max} ${stepinterp}
+    printMessage "Generando Escala a partir de ${zmin}/${zmax} con fichero CPT ${cptGMT}"
+    ./crearescala.sh ${zmin}/${zmax} ${cptGMT} ${TMPDIR}/escala.png  ${unidadEscala} #2>> ${errorsFile}
 
 
     ffmpeg -f image2 -i ${TMPDIR}/${variablefondo}%03d.png -f image2 -i ${fronterasPNG} -filter_complex "overlay" -vsync 0 ${TMPDIR}/kk%03d.png
@@ -256,16 +290,19 @@ then
             tmpFile="${TMPDIR}/${fecha}-msl-HL.png"
 
             # Sacamos las dimensiones en cm para la proyección dada
-            read w h < <(gmt mapproject ${J} ${R} -W)
-            echo $w $h
-            printMessage "Generando frame para fecha ${fecha}"
-            pintarPresionAyB
+#            read w h < <(gmt mapproject ${J} ${R} -W)
+#            echo $w $h
+
+            if [ ${fecha} -ge ${minreal} ]
+            then
+                printMessage "Generando frame para fecha ${fecha}"
+                pintarPresionAyB
 
 
-            cp ${tmpFile} ${TMPDIR}/mslhl`printf "%03d\n" ${nframe}`.png
+                cp ${tmpFile} ${TMPDIR}/mslhl`printf "%03d\n" ${nframe}`.png
 
-            nframe=$((${nframe}+1))
-#            exit
+                nframe=$((${nframe}+1))
+            fi
 
             fecha=`date -u --date="${fecha:0:8} ${fecha:8:4} +${mins} minutes" +%Y%m%d%H%M`
         done
@@ -322,7 +359,7 @@ if [ ${pintarIntensidad} -eq 1 ]
 then
     cptGMT="white"
 fi
-
+cptGMT="cpt/v10m_201404.cpt"
 
 fecha=${min}
 fechamax=${max}
@@ -383,6 +420,7 @@ nframe=1
 
 printMessage "Generando los frames de Viento (U y V) desde ${fecha} hasta ${fechamax}"
 #Recortamos los grids a la región seleccionada y transformamos la unidades
+sigmin=`date -u --date="${min:0:8} ${min:8:2} +3 hours" +%Y%m%d%H%M`
 while [ ${fecha} -le ${fechamax} ]
 do
     ncFile="${TMPDIR}/${fecha}.nc"
@@ -395,9 +433,16 @@ do
     ncFileV=${ncFile}?v10
 
     nframesfecha=${nframes}
+    if [ ${fecha} -le ${sigmin} ]
+    then
+        nframesfecha=${nframesinicio}
+    fi
+
+
     if [ ${fecha} -eq ${min} ]
     then
-        nframesfecha=$((${nframes}+${nframesloop}-1))
+#        nframesfecha=$((${nframes}+${nframesloop}-1))
+        nframesfecha=$((${nframesfecha}+${nframesloop}-1))
     fi
 
     printMessage "Generando ${nframesfecha} frames para fecha ${fecha}"
@@ -506,8 +551,9 @@ done
 
 #exit
 
+
 nframerotulo=1
-fecha=${min}
+fecha=${minreal}
 fechamax=${max}
 printMessage "Generando frames de rotulos"
 while [ ${fecha} -le ${fechamax} ]
@@ -523,12 +569,17 @@ do
 
     nframerotulo=$((nframerotulo+1))
 
+    if [ ${fecha} -eq ${minreal} ] && [ ${steprotulo} -eq  ${stepviento} ]
+    then
+        fecha=`date -u --date="${fecha:0:8} ${fecha:8:2} -${desfasemin} hours" +%Y%m%d%H%M`
+    fi
+
     fecha=`date -u --date="${fecha:0:8} ${fecha:8:2} +${steprotulo} hours" +%Y%m%d%H%M`
 done
 
 #if [ ${esprecipitacion} -eq 1 ] && [ ${esprecacum} -eq 0 ]
 #then
-#    cp ${TMPDIR}/rotulo-001.png ${TMPDIR}/rotulo-000.png
+#    cp ${TMPDIR}/rotulo-002.png ${TMPDIR}/rotulo-001.png
 #fi
 
 
@@ -550,7 +601,7 @@ yscala=$((${yscala}-${scaleheight}/2))
 
 opciones=" -f image2 -i ${TMPDIR}/rotulo-001.png"
 finicial=${nframesrotulo}
-ffinal=$(( ${nframes}+${nframesloop} ))
+ffinal=$(( ${nframesinicio}+${nframesloop} -1 ))
 
 
 #Fondo del mar
@@ -602,8 +653,10 @@ filtro="${filtro}[2]loop=20:1:0[escala];[escala]fade=in:0:10[escala];[out][escal
 
 # Opciones de filtro para solapar los rotulos
 nframesrotuloi=$(( ${steprotulo}*60/${mins} ))
-nstep=1
+nstep=0
+nstepinicio=1
 j=0
+nfinicio=${nframesinicio}
 for((i=2; i<${nframerotulo}; i++))
 do
     opciones="${opciones} -f image2 -i ${TMPDIR}/rotulo-`printf "%03d" ${i}`.png"
@@ -611,19 +664,27 @@ do
 #    finicial=$(( (${i}-1)*${nframes}+${nframesloop} ))
 #    ffinal=$(( ${i}*${nframes}+${nframesloop}-1 ))
 
-    finicial=$(( ${nstep}*${nframes}+${nframesloop} + ${j}*${slowmotion}*${nframesrotuloi} + 1 ))
-    ffinal=$(( ${nstep}*${nframes}+${nframesloop} + (${j}+1)*${slowmotion}*${nframesrotuloi}  ))
+    finicial=$(( ${nstepinicio}*${nframesinicio}+${nstep}*${nframes}+${nframesloop} + ${j}*${slowmotion}*${nframesrotuloi}  ))
+    ffinal=$(( ${nstepinicio}*${nframesinicio}+${nstep}*${nframes}+${nframesloop} + (${j}+1)*${slowmotion}*${nframesrotuloi} -1 ))
 
-    if [ $(( (${i} -1) % (${stepviento}/${steprotulo}) )) -eq 0 ]
+    if [ $(( (${i} + ${desfasemin} -1) % (${stepviento}/${steprotulo}) )) -eq 0 ]
     then
-        ffinal=$(( (${nstep}+1)*${nframes}+${nframesloop} ))
-        nstep=$((${nstep}+1))
+
+
+        if [ ${nstepinicio} -lt 2 ]
+        then
+            nstepinicio=$((${nstepinicio}+1))
+        else
+            nstep=$((${nstep}+1))
+        fi
+        ffinal=$(( ${nstep}*${nframes}+${nframesloop}+${nframesinicio}*${nstepinicio} -1 ))
         j=0
     else
         j=$((${j}+1))
     fi
 
     filtro="${filtro}[out];[out][$((${i}+3))]overlay=enable=between(n\,${finicial}\,${ffinal})"
+
 done
 
 

@@ -6,6 +6,7 @@ read zmin zmax < <(echo $1 | tr "/" " ")
 cptFile=$2
 output=$3
 unidad=$4
+titulo=$5
 
 TMPDIR=/tmp
 heightdiv=45
@@ -32,6 +33,9 @@ then
     offset=$(( ${heightdiv}/2 ))
 fi
 
+
+
+
 convert -size 35x${scaleheight} xc:transparent ${output}
 
 
@@ -54,18 +58,32 @@ do
     i=$(($i+1))
 done < <(awk '{print "rgb("$2")"}' ${dir}/tmp.cpt| tr "/" ",")
 
-
+#exit
 
 
 # Pintamos un marco con un ancho de 2 pixeles
 #convert ${output} -stroke black -strokewidth 2 -fill "transparent" -draw "rectangle 0,${offset}, 34,$((${scaleheight}-1))" ${output}
 convert ${output} -stroke black -strokewidth 2 -fill "transparent" -draw "polygon 34,${offset} 17,0 0,${offset} 0,$((${scaleheight}-1)) 34,$((${scaleheight}-1))" ${output}
+#exit
 
 
+
+
+dy=45
+dtitulo=0
+if [ ! -z ${titulo} ]
+then
+    dtitulo=30
+    dy=$((${dy}+${dtitulo}))
+
+fi
+
+#echo $offset
 # Creamos el efecto sombra para la escala y ampliamos el lienzo para poder pintar los rotulos
 #convert -size 85x$((${scaleheight}+45)) xc:none -fill 'gray' -draw "rectangle 5,35 40,$((${scaleheight}+35))" -blur 0x1 ${dir}/fescala.png
-convert -size 85x$((${scaleheight}+45)) xc:none -fill 'gray' -draw "polygon 40,$((35+${offset})) 22,35 5,$((35+${offset})) 5,$((${scaleheight}+35)) 40,$((${scaleheight}+35))" -blur 0x1 ${dir}/fescala.png
-composite -geometry +4+34 ${output} ${dir}/fescala.png ${output}
+convert -size 85x$((${scaleheight}+${dy})) xc:none -fill 'gray' -draw "polygon 40,$((${dy}-10+${offset})) 22,$((${dy}-10)) 5,$((${dy}-10+${offset})) 5,$((${scaleheight}+${dy}-10)) 40,$((${scaleheight}+${dy}-10))" -blur 0x1 ${dir}/fescala.png
+composite -geometry +4+$((${dy}-11)) ${output} ${dir}/fescala.png ${output}
+
 
 
 # Pintamos los valores de la escala
@@ -74,21 +92,31 @@ while read rotulo
 do
     convert -size 50x30 xc:none -font Helvetica-Bold -pointsize 24 -fill white -gravity east \
     -annotate +0+6 "${rotulo}" \( +clone -background none -shadow 80x2+1+1 \) +swap  \
-    -flatten miff:- | composite -geometry +33+$(( (${scaleheight}+15)-${i}*${heightdiv} )) - ${output} ${output}
+    -flatten miff:- | composite -geometry +33+$(( (${scaleheight}+${dtitulo}+15)-${i}*${heightdiv} )) - ${output} ${output}
 
     i=$(($i+1));
 done < <(awk '{print $1}' ${dir}/tmp.cpt)
+
 
 
 # Pintamos el valor máximo de la escala
 rotulo=`awk '{print $3}'  ${dir}/tmp.cpt | tail -n 1`
 convert -size 50x30 xc:none -font Helvetica-Bold -pointsize 24 -fill white -gravity east \
 -annotate +0+6 "${rotulo}" \( +clone -background none -shadow 80x2+1+1 \) +swap  \
--flatten miff:- | composite -geometry +33+$(( (${scaleheight}+15)-$i*${heightdiv} )) - ${output} ${output}
+-flatten miff:- | composite -geometry +33+$(( (${scaleheight}+${dtitulo}+15)-$i*${heightdiv} )) - ${output} ${output}
+
 
 # Pintamos el rótulo de la unidad
 convert -size 75x25 xc:none -font Helvetica-Bold -pointsize 24 -fill white -gravity west \
 -annotate +0+0 ${unidad} \( +clone -background none -shadow 80x2+1+1 \) +swap  \
--flatten miff:- | composite -geometry +0+0 - ${output} ${output}
+-flatten miff:- | composite -geometry +0+${dtitulo} - ${output} ${output}
+
+if [ ! -z ${titulo} ]
+then
+    # Pintamos el rótulo de la unidad
+    convert -size 95x25 xc:none -font Helvetica-Bold -pointsize 26 -fill white -gravity west \
+    -annotate +0+0 ${titulo} \( +clone -background none -shadow 80x2+1+1 \) +swap  \
+    -flatten miff:- | composite -geometry +0+0 - ${output} ${output}
+fi
 
 rm -rf ${dir}

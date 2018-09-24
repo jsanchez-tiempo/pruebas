@@ -410,7 +410,7 @@ function black2transparentFrames {
 
 function replicarFrames {
 
-    var=$1
+    local var=$1
 
     if [ ${slowmotion} -gt 1 ]
     then
@@ -419,9 +419,9 @@ function replicarFrames {
         rename -f "s/kk/${var}/" ${TMPDIR}/kk*.png
     fi
 
-    nframesintermedios=$((${slowmotion}*180/${mins}))
-    nframesintermediosinicio=$((${slowmotion}*180/${mins}-${desfasemin}*${slowmotion}*60/${mins}))
-    filtro="loop=$(( ${nframesinicio}+${nframesloop}-${slowmotion} )):1:0"
+    local nframesintermedios=$((${slowmotion}*180/${mins}))
+    local nframesintermediosinicio=$((${slowmotion}*180/${mins}-${desfasemin}*${slowmotion}*60/${mins}))
+    local filtro="loop=$(( ${nframesinicio}+${nframesloop}-${slowmotion} )):1:0"
 
     fecha=${min}
     i=0
@@ -557,9 +557,130 @@ function interpolarPREC {
         fecha=`date -u --date="${min:0:8} ${min:8:2} +1 hours" +%Y%m%d%H%M`
         cp ${TMPDIR}/${fecha}_${vardst}.nc ${TMPDIR}/${min}_${vardst}.nc
     fi
+}
 
 
 
+
+
+
+
+
+
+
+
+
+
+#####################################
+
+function pintarMaximosPREC {
+
+
+    fecha=$1
+    nframe=$2
+
+
+    dataFile=${TMPDIR}/${fecha}_acumprec.nc
+
+    printMessage "Calculando los máximos locales de la precipitación"
+
+#    ogr2ogr -where "ISO2='ES'" -f "GMT" ${TMPDIR}/tmpREG0.gmt fronteras/gadm28_adm0.shp
+    gmt pscoast -EES -M > ${TMPDIR}/tmpREG0.gmt
+
+
+    gmt grdcontour ${dataFile} ${J} ${R} -A100+t"${TMPDIR}/contourlabels.txt" -T++a+d20p/1p+lLH -Q100 -Gn1/2c  -C10 > /dev/null
+    gmt grdtrack ${TMPDIR}/contourlabels.txt -G${dataFile} > ${TMPDIR}/kkcontourlabels.txt
+    mv ${TMPDIR}/kkcontourlabels.txt ${TMPDIR}/contourlabels.txt
+
+#    read w h < <(gmt grdinfo -C ${dataFile} | awk '{print $3,$5}')
+    read w h < <(gmt mapproject -R -J -W)
+
+    cat ${TMPDIR}/contourlabels.txt | gmt mapproject ${JGEOG} ${RGEOG} -I | awk 'BEGIN{print "x,y,z"}{if($4=="H") printf "%s,%s,%.0f\n",$1,$2,$5}' > ${TMPDIR}/coords.csv
+
+    filecoord=`echo ${TMPDIR}/coords.csv | sed 's/\//\\\\\//g'`
+    sed "s/_FILECOORDS/${filecoord}/" coords.vrt > ${TMPDIR}/coords.vrt
+    ogr2ogr -f "ESRI Shapefile" ${TMPDIR}/coords ${TMPDIR}/coords.vrt
+    ogr2ogr -f gpkg ${TMPDIR}/merged.gpkg fronteras/gadm28_adm0.shp -where "ISO2='ES'"
+    ogr2ogr -f gpkg -append -update ${TMPDIR}/merged.gpkg ${TMPDIR}/coords/output.shp
+    ogr2ogr -f csv ${TMPDIR}/coordsfilter.csv -dialect sqlite -sql "SELECT b.x,b.y,b.z FROM gadm28_adm0 a, output b  WHERE contains(a.geom, b.geom)"  ${TMPDIR}/merged.gpkg
+
+
+    ########### HAY QUE QUITAR EL MAPPROJECT CUANDO SE REPROYECTEN LOS GRIDS !!!!!!
+#    awk '{if($4=="H") printf "%s %s %.0f\n",$1,$2,$5}' ${TMPDIR}/contourlabels.txt | sort -k3,3 -n -r | head -n 15 | gmt mapproject -R -J > ${TMPDIR}/Tlabels.txt
+    awk -F "," 'NR>1{print $1,$2,$3}'  ${TMPDIR}/coordsfilter.csv  | sort -k3,3 -n -r | gmt mapproject ${JGEOG} ${RGEOG} | awk  -f filtrarintersecciones.awk  | head -n 10 > ${TMPDIR}/Tlabels.txt
+
+    read rotulowidth rotuloheight < <(convert rotulos/rotuloprec/rp000.png -ping -format "%w %h" info:)
+    filtro="[1]setpts=0.5*PTS+${nframe}/(25*TB)[rotulo0];[0]copy[out]"
+    textos=""
+    i=0
+    while read line
+    do
+        #echo $line
+        lon=`echo ${line} | awk '{print $1}'`
+        lat=`echo ${line} | awk '{print $2}'`
+        t=`echo ${line} | awk '{print $3}'`
+        x=`awk -v x=${lon} -v w=${w} -v rw=65  'BEGIN{printf "%d",1920*x/w - rw }'`
+        y=`awk -v y=${lat} -v h=${h} -v rh=${rotuloheight} 'BEGIN{printf "%d",1080-1080*y/h - rh/2 }'`
+#        if [ ${y} -lt 0 ]
+#        then
+#
+#        fi
+
+
+        xtext=${x}
+        ytext=$((${y}+25))
+
+        filtro="${filtro};[rotulo${i}]split[rotulo${i}][rotulo$((${i}+1))]"
+#        if [ ${y} -lt 0 ]
+#        then
+#            filtro="${filtro};[rotulo${i}]vflip[rotulo${i}]"
+#            y=`awk -v y=${lat} -v h=${h}  'BEGIN{printf "%d",1080-1080*y/h}'`
+#            ytext=$((${y}+18+65))
+#        fi
+
+#        convert -font Roboto-Bold  -pointsize 26 -fill "white" -annotate +0+0 "${t}mm" -gravity east \( -size 180x50 xc:transparent \) \( +clone -background gray -shadow 80x2+1+1 -crop 180x50+0+0 \) +swap -composite png32:${TMPDIR}/t${i}.png
+        convert -size 180x50 xc:none -font Roboto-Bold  -pointsize 26 -fill "white" -gravity east -annotate +0+0 "${t}mm"   \( +clone -background none -shadow 80x2+1+1 \) +swap -flatten -crop 180x50+0+0 png32:${TMPDIR}/t${i}.png
+        textos="${textos} -f image2  -i ${TMPDIR}/t${i}.png"
+
+        filtro="${filtro};[out][rotulo${i}]overlay= x=${x}: y=${y}[out]; [out][$((${i}+2))]overlay= x=${xtext}: y=${ytext}: enable=gt(n\,$((${nframe}+22)))[out]"
+#        filtro="${filtro};[out][rotulo${i}]overlay= x=${x}: y=${y}[out]; [out]drawtext=fontsize=30:fontfile=Roboto-Bold.ttf:text=\'${t} mm\':x=${xtext}:y=${ytext}:enable=gt(n\,$((${nframe}+22)))[out]"
+
+        i=$((${i}+1))
+
+#        rename -f 's/kkd/kkc/' ${TMPDIR}/kkd-*.png
+
+    done < <(sed '$ d' ${TMPDIR}/Tlabels.txt)
+
+    line=`tail -n 1 ${TMPDIR}/Tlabels.txt`
+
+    lon=`echo ${line} | awk '{print $1}'`
+    lat=`echo ${line} | awk '{print $2}'`
+    t=`echo ${line} | awk '{print $3}'`
+    x=`awk -v x=${lon} -v w=${w} -v rw=65 'BEGIN{printf "%d",1920*x/w - rw}'` #rw es la distancia en pixeles desde el pixel 0 hasta el centro del punto
+    y=`awk -v y=${lat} -v h=${h} -v rh=${rotuloheight} 'BEGIN{printf "%d",1080-1080*y/h - rh/2 }'`
+
+
+    xtext=${x}
+    ytext=$((${y}+25))
+#    if [ ${y} -lt 0 ]
+#    then
+#        filtro="${filtro};[rotulo${i}]vflip[rotulo${i}]"
+#        y=`awk -v y=${lat} -v h=${h}  'BEGIN{printf "%d",1080-1080*y/h}'`
+#        ytext=$((${y}+18+65))
+#    fi
+
+#    convert -font Roboto-Bold  -pointsize 26 -fill "white" -annotate +0+0 "${t}mm" -gravity east \( -size 180x50 xc:transparent \) \( +clone -background gray -shadow 80x2+1+1 -crop 180x50+0+0 \) +swap -composite png32:${TMPDIR}/t${i}.png
+    convert -size 180x50 xc:none -font Roboto-Bold  -pointsize 26 -fill "white" -gravity east -annotate +0+0 "${t}mm"   \( +clone -background none -shadow 80x2+1+1 \) +swap -flatten -crop 180x50+0+0 png32:${TMPDIR}/t${i}.png
+    textos="${textos} -f image2  -i ${TMPDIR}/t${i}.png"
+    filtro="${filtro};[out][rotulo${i}]overlay= x=${x}: y=${y}[out];[out][$((${i}+2))]overlay= x=${xtext}: y=${ytext}:enable=gt(n\,$((${nframe}+22)))"
+#    filtro="${filtro};[out][rotulo${i}]overlay= x=${x}: y=${y}[out];[out]drawtext=fontsize=30:fontfile=Roboto-Bold.ttf:text=\'${t} mm\':x=${xtext}:y=${ytext}:enable=gt(n\,$((${nframe}+22)))"
+
+    printMessage "Insertando una animación por cada punto calculado"
+    ffmpeg -f image2 -i  ${TMPDIR}/kkb-%03d.png -f image2  -i rotulos/rotuloprec/rp%03d.png  ${textos} -filter_complex "${filtro}" -y -c:v png -f image2 ${TMPDIR}/kkc-%03d.png 2> ${errorsFile}
+    rename -f 's/kkc/kkb/' ${TMPDIR}/kkc-*.png
 
 }
+
+
+
 

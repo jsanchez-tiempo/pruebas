@@ -84,6 +84,7 @@ function pintarPresion {
 
     dataFile=$1
     color="white"
+        color="gray35"
     disobaras=2
     detiquetas=4
 
@@ -166,7 +167,7 @@ function pintarPresionAyBGlobal {
 
 
 #    echo ${dlat} ${dlon}
-
+#    nicono=0
     # Creamos una imagen vacia transparente de tamaño fullhd
     convert -size ${xsize}x${ysize} xc:transparent png32:${tmpFile}
     while read line
@@ -223,9 +224,13 @@ function pintarPresionAyBGlobal {
         #Realizamos la transformación geométrica y colocamos la letra en su posición
         convert -size ${xsizetemp}x${ysizetemp} xc:none -font Roboto-Bold -pointsize 75 -fill "${color}" -gravity center -annotate +0+25 "${letra}" \
          -pointsize 35 -fill "${color}" -gravity center -annotate +0-30 "${presion}" \
-          -matte -virtual-pixel transparent -distort Perspective "${transformacion}"\
+          -matte -virtual-pixel transparent -mattecolor none -distort Perspective "${transformacion}"\
            \( +clone -background none -shadow 70x1-${dpx}+${dpy} \) +swap -flatten miff:- |\
          composite -geometry +${x}+$((${y})) - ${tmpFile} png32:${tmpFile}
+
+#        echo $nicono
+#         cp ${tmpFile} ${TMPDIR}/${nicono}.png
+#         nicono=$(($nicono + 1))
 
     done <  ${TMPDIR}/contourlabels.txt
 

@@ -4,8 +4,6 @@
 
 
  if(fechas[$8]["fecha"]!=fechaanterior){
-	#if(countmax[$8]<count[$8])
-	#	countmax[$8]=count[$8];
 	if(count[$8]>=n)
 		print acum[$8];
 	count[$8]=0;

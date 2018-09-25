@@ -41,7 +41,9 @@ awk -v scale=${scale} -f newlatlon.awk | awk '{print $1,$2; print $3,$4}' | gmt 
 
 pintarViento=1
 pintarIntensidad=1
-pintarPresion=1
+pintarPresion=0
+
+escalaViento=1
 
 #titulo="Viento en superficie"
 titulo="Prec, nieve y presión"
@@ -54,7 +56,7 @@ min=201803150100
 #max=201808010300
 #max=201809052100
 max=201803160000
-#max=201803150300
+max=201803150300
 #max=201808310300
 
 ## Si es precipitación prevista y corresponde al dato de un paso de tiempo (múltiplo de 3)
@@ -108,7 +110,7 @@ TMPDIR="/tmp"
 
 OUTPUTS_DIR="/home/juan/Proyectos/pruebas/gmt/OUTPUTS/"
 outputFile="${OUTPUTS_DIR}/viento-meteored2.mkv"
-outputFile="${OUTPUTS_DIR}/vientopruebaan-meteored.mkv"
+outputFile="${OUTPUTS_DIR}/vientopruebaescalas-meteored.mkv"
 
 
 # Diretorio temporal
@@ -141,7 +143,9 @@ JGEOG=${J}
 RGEOG=${R}
 
 variablesanimacion=("nubes" "prec" "nieve")
-indexescala=1
+nombresvariables=("Nubes" "Lluvia" "Nieve")
+
+indexescala=(1 2)
 opcionesEntrada=""
 
 if [ ${pintarIntensidad} -eq 1 ]
@@ -225,13 +229,6 @@ then
         fi
         replicarFrames "${variablefondo}"
 
-
-        if [ ${ivar} -eq ${indexescala} ]
-        then
-            calcularMinMax "${variablefondo}" ${min} ${max} ${stepinterp}
-            printMessage "Generando Escala a partir de ${zmin}/${zmax} con fichero CPT ${cptGMT}"
-            ./crearescala.sh ${zmin}/${zmax} ${cptGMT} ${TMPDIR}/escala.png  ${unidadEscala} #2>> ${errorsFile}
-        fi
         opcionesEntrada="${opcionesEntrada} -f image2 -i ${TMPDIR}/${variablefondo}%03d.png"
         if [ ${ivar} -gt 0 ]
         then
@@ -242,6 +239,24 @@ then
 
     done
 
+    i=0
+    for ivar in ${indexescala[*]}
+    do
+        variablefondo=${variablesanimacion[${ivar}]}
+        cargarVariable ${variablefondo}
+        calcularMinMax "${variablefondo}" ${min} ${max} ${stepinterp}
+        printMessage "Generando Escala a partir de ${zmin}/${zmax} con fichero CPT ${cptGMT}"
+        P=""
+        if [ ${tipoescala[${i}]} == "h" ]
+        then
+            P="-p"
+        fi
+        ./crearescala.sh ${zmin}/${zmax} ${cptGMT} ${TMPDIR}/escala${ivar}.png  ${unidadEscala} ${nombresvariables[${ivar}]} #2>> ${errorsFile}
+
+        i=$((${i}+1))
+
+    done
+
     echo ${opcionesEntrada}
     echo ${filtro}
 
@@ -249,6 +264,7 @@ then
     ffmpeg ${opcionesEntrada} -f image2 -i ${fronterasPNG} -filter_complex ${filtro} -vsync 0 ${TMPDIR}/kk%03d.png
     rename -f "s/kk/${variablefondo}/" ${TMPDIR}/kk*.png
 fi
+
 
 
 if [ ${pintarPresion} -eq 1 ]
@@ -286,7 +302,8 @@ then
     # Filtramos los máximos A y lo mínimos B quitando aquellos que aparezcan menos frames de nminframes. Esto evita que aparezcan A y B que aparecen y desaparecen rapidamente
     paste <(awk '{print $1"\t"$2"\t"$3}' ${TMPDIR}/maxmins.txt) <(awk '{print $2,$3,$4,$5}' ${TMPDIR}/maxmins.txt | gmt mapproject ${J} ${R}) > ${TMPDIR}/maxmins2.txt
     awk -v umbral=${umbral} -f filtrarpresion.awk ${TMPDIR}/maxmins2.txt > ${TMPDIR}/maxmins3.txt
-    awk -v mins=${mins} -v n=${nminframes} -f letrasconsecutivas.awk ${TMPDIR}/maxmins3.txt > ${TMPDIR}/maxmins4.txt
+    awk -v mins=${mins} -v n=${nminframes} -f letrasconsecutivas.awk ${TMPDIR}/maxmins3.txt | sort -k1,1 |\
+     awk -v N=5 -v nf=4  -v maxfecha=${max} -v minfecha=${minreal} -f suavizarletras.awk> ${TMPDIR}/maxmins4.txt
 
     filelines=`wc -l ${TMPDIR}/maxmins4.txt | awk '{print $1}'`
 
@@ -309,7 +326,7 @@ then
         while [ ${fecha} -le ${max} ]
         do
 
-            grep ^${fecha} ${TMPDIR}/maxmins4.txt | awk '{print $2,$3,$6,$7}' > ${TMPDIR}/contourlabels.txt
+            grep ^${fecha} ${TMPDIR}/maxmins4.txt | awk '{print $2,$3,$6,$7,$9}' > ${TMPDIR}/contourlabels.txt
 
             tmpFile="${TMPDIR}/${fecha}-msl-HL.png"
 
@@ -347,6 +364,8 @@ fi
 if [ ${pintarViento} -eq 1 ]
 then
 
+    zmin=9999
+    zmax=-9999
     read w h < <(gmt mapproject ${JGEOG} ${RGEOG} -W)
 
     ymin=0
@@ -369,6 +388,8 @@ then
     fi
     cptGMT="cpt/v10m_201404.cpt"
 
+
+
     fecha=${min}
     fechamax=${max}
 
@@ -388,6 +409,16 @@ then
     then
         comando="gmt mapproject -JX${w}c/${w}c ${RAMP}"
     #    comando="gmt mapproject ${J} ${RAMP}"
+    fi
+
+    read zminlocal zmaxlocal < <(awk 'BEGIN{min=9999; max=-9999}$5<min{min=$5}$5>max{max=$5}END{print min" "max}' ${TMPDIR}/dparticulas.txt)
+    if (( `echo "${zminlocal} <  ${zmin}" | bc -l` ))
+    then
+        zmin=${zminlocal}
+    fi
+    if (( `echo "${zmaxlocal} >  ${zmax}" | bc -l` ))
+    then
+        zmax=${zmaxlocal}
     fi
 
     paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulas.txt | gmt mapproject ${RGEOG} ${JGEOG} | ${comando} )\
@@ -487,6 +518,16 @@ then
 
             awk '{print $1,$2}' ${TMPDIR}/particulas.txt | gmt grdtrack  -G${ncFileU} -G${ncFileV} | awk -v scale=${scale}  -f newlatlon.awk > ${TMPDIR}/dparticulas.txt
 
+            read zminlocal zmaxlocal < <(awk 'BEGIN{min=9999; max=-9999}$5<min{min=$5}$5>max{max=$5}END{print min" "max}' ${TMPDIR}/dparticulas.txt)
+            if (( `echo "${zminlocal} <  ${zmin}" | bc -l` ))
+            then
+                zmin=${zminlocal}
+            fi
+            if (( `echo "${zmaxlocal} >  ${zmax}" | bc -l` ))
+            then
+                zmax=${zmaxlocal}
+            fi
+
 
 
     #        paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulas.txt | gmt mapproject ${RGEOG} ${JGEOG} ) <(awk '{print $3,$4,$5}' ${TMPDIR}/dparticulas.txt | gmt mapproject ${RGEOG} ${JGEOG}) |\
@@ -557,6 +598,29 @@ then
         fecha=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
     done
 
+    if [ ${escalaViento} -eq 1 ]
+    then
+
+        ivar=$(( `echo ${indexescala[*]} | tr " " "\n" | sort -nr | head -n 1` + 1 ))
+        index=${#indexescala[*]}
+        indexescala[${index}]=${ivar}
+        cargarVariable "uv"
+#        calcularMinMax "${variablefondo}" ${min} ${max} ${stepinterp}
+        printMessage "Generando Escala a partir de ${zmin}/${zmax} con fichero CPT ${cptGMT}"
+        P=""
+
+        echo ${tipoescala[*]}
+        echo ${index} ${tipoescala[${index}]}
+        if [ ${tipoescala[${index}]} == "h" ]
+        then
+            P="-p"
+        fi
+        ./crearescala.sh ${zmin}/${zmax} ${cptGMT} ${TMPDIR}/escala${ivar}.png  ${unidadEscala} "Viento" ${P} #2>> ${errorsFile}
+    fi
+
+#    exit
+
+
 fi
 #exit
 
@@ -588,16 +652,35 @@ done
 
 
 
-scaleheight=`convert ${TMPDIR}/escala.png -ping -format "%h" info:`
-if [ ${scaleheight} -ge 790 ]
-then
-    convert ${TMPDIR}/escala.png -resize 85x800\> ${TMPDIR}/escala.png
-    scaleheight=790
-fi
+nescalas=${#indexescala[*]}
+escalas=""
 
-yscala=$((${yscala}-${scaleheight}/2))
+for ((i=0; i<${nescalas}; i++))
+do
+    ivar=${indexescala[${i}]}
+    escalas="${escalas} -f image2 -i  ${TMPDIR}/escala${ivar}.png"
 
+    if [ ${tipoescala[${i}]} == "h" ]
+    then
+        scalewidth=`convert ${TMPDIR}/escala${ivar}.png -ping -format "%w" info:`
+        if [ ${scalewidth} -ge 1000 ]
+        then
+            convert ${TMPDIR}/escala${ivar}.png -resize 1000 ${TMPDIR}/escala${ivar}.png
+            scalewidth=1000
+        fi
 
+        xscala[${i}]=$((${xscala[${i}]}-${scalewidth}/2))
+    else
+        scaleheight=`convert ${TMPDIR}/escala${ivar}.png -ping -format "%h" info:`
+        if [ ${scaleheight} -ge 790 ]
+        then
+            convert ${TMPDIR}/escala${ivar}.png -resize 85x800\> ${TMPDIR}/escala${ivar}.png
+            scaleheight=790
+        fi
+
+        yscala[${i}]=$((${yscala[${i}]}-${scaleheight}/2))
+    fi
+done
 
 #Ponemos los rotulos
 
@@ -607,7 +690,7 @@ ffinal=$(( ${nframesinicio}+${nframesloop} -1 ))
 
 
 #Fondo del mar
-filtro="[$((${nframerotulo}+${nlogos}+${pintarViento}+2))]loop=-1[mar];[mar][0]overlay[out];"
+filtro="[$((${nframerotulo}+${nlogos}+${pintarViento}+${nescalas}+1))]loop=-1[mar];[mar][0]overlay[out];"
 
 if [ ${pintarViento} -eq 1 ]
 then
@@ -619,7 +702,7 @@ fi
 if [ ! -z ${global} ] && [  ${global} -eq 1 ]
 then
 
-    filtro="${filtro}[out]setsar=sar=1,format=rgba[out];[$((${nframerotulo}+${nlogos}+${pintarIntensidad}+${pintarPresion}+${pintarViento}+3))]setsar=sar=1,format=rgba[sombra];[out][sombra]blend=all_mode=multiply:all_opacity=1,format=yuva422p10le[out];"
+    filtro="${filtro}[out]setsar=sar=1,format=rgba[out];[$((${nframerotulo}+${nlogos}+${pintarIntensidad}+${pintarPresion}+${pintarViento}+${nescalas}+2))]setsar=sar=1,format=rgba[sombra];[out][sombra]blend=all_mode=multiply:all_opacity=1,format=yuva422p10le[out];"
     frameSombra=" -f image2 -i ${filesombra}"
 fi
 
@@ -628,7 +711,7 @@ framesUV=""
 if [ ${pintarIntensidad} -eq 1 ]
 then
 #    filtro="[1]fade=in:$((${nframesloop}-15)):15[viento];[$((${nframerotulo}+${nlogos}+4))]fade=in:$((${nframesloop}-15)):15[uv];[0][uv]overlay[out];[out][viento]overlay[out];"
-    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarViento}+3))]fade=in:$((${nframesloop}-15)):15[uv];[out][uv]overlay=shortest=1[out];"
+    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarViento}+${nescalas}+2))]fade=in:$((${nframesloop}-15)):15[uv];[out][uv]overlay=shortest=1[out];"
     framesUV="-f image2 -i ${TMPDIR}/${variablefondo}%03d.png"
     echo ${var}
 fi
@@ -641,14 +724,22 @@ fi
 
 if [ ${pintarPresion} -eq 1 ]
 then
-    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarIntensidad}+${pintarViento}+3))]fade=in:$((${nframesloop}-15)):15[press];[out][press]overlay=shortest=1[out];"
+    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarIntensidad}+${pintarViento}+${nescalas}+2))]fade=in:$((${nframesloop}-15)):15[press];[out][press]overlay=shortest=1[out];"
     framesPress="-f image2 -i ${TMPDIR}/msl%03d.png"
 fi
 
+#
+#filtro="${filtro}[$((${pintarViento}+1))]loop=20:1:0[escala];[escala]fade=in:0:10[escala];[out][escala]overlay=x=${xscala}:y=${yscala}[out];\
+#[out][$((${pintarViento}+2))]overlay=x=${xcartel}:y=${ycartel}[out];[out][$((${pintarViento}+3))]overlay=enable=between(n\,${finicial}\,${ffinal})"
 
-filtro="${filtro}[$((${pintarViento}+1))]loop=20:1:0[escala];[escala]fade=in:0:10[escala];[out][escala]overlay=x=${xscala}:y=${yscala}[out];\
-[out][$((${pintarViento}+2))]overlay=x=${xcartel}:y=${ycartel}[out];[out][$((${pintarViento}+3))]overlay=enable=between(n\,${finicial}\,${ffinal})"
+#Colocamos las escalas
+for ((i=0; i<${nescalas}; i++))
+do
+    filtro="${filtro}[$((${pintarViento}+${i}+1))]loop=20:1:0[escala${i}];[escala${i}]fade=in:0:10[escala${i}];[out][escala${i}]overlay=x=${xscala[${i}]}:y=${yscala[${i}]}[out];"
+done
 
+#Colocamos el cartel del título
+filtro="${filtro}[out][$((${pintarViento}+${nescalas}+1))]overlay=x=${xcartel}:y=${ycartel}[out];[out][$((${pintarViento}+${nescalas}+2))]overlay=enable=between(n\,${finicial}\,${ffinal})"
 
 #"[$((${nframerotulo}+${nlogos}+4))]fade=in:0:10[uv]"
 
@@ -684,7 +775,7 @@ do
         j=$((${j}+1))
     fi
 
-    filtro="${filtro}[out];[out][$((${i}+2+${pintarViento}))]overlay=enable=between(n\,${finicial}\,${ffinal})"
+    filtro="${filtro}[out];[out][$((${i}+${nescalas}+${pintarViento}+1))]overlay=enable=between(n\,${finicial}\,${ffinal})"
 
 done
 
@@ -699,13 +790,13 @@ logos=""
 if [ ${nlogos} -gt 0 ]
 then
     logos="-f image2 -i ${logo[0]} "
-    filtro="${filtro}[out];[out][$((${nframerotulo}+2+${pintarViento}))]overlay=${xlogo[0]}:${ylogo[0]}"
+    filtro="${filtro}[out];[out][$((${nframerotulo}+1+${pintarViento}+${nescalas}))]overlay=${xlogo[0]}:${ylogo[0]}"
 fi
 
 for((nlogo=1; nlogo<${nlogos}; nlogo++))
 do
     logos="${logos} -f image2 -i ${logo[${nlogo}]} "
-    filtro="${filtro};[out][$((${nframerotulo}+${nlogo}+2+${pintarViento}))]overlay=${xlogo[${nlogo}]}:${ylogo[${nlogo}]}"
+    filtro="${filtro};[out][$((${nframerotulo}+${nlogo}+1+${pintarViento}+${nescalas}))]overlay=${xlogo[${nlogo}]}:${ylogo[${nlogo}]}"
 done
 
 
@@ -723,5 +814,5 @@ done
 
 echo $filtro
 
-ffmpeg -y -f image2 -i ${fondoPNG} ${framesViento} -f image2 -i  ${TMPDIR}/escala.png -f image2 -i  ${framescartel} ${opciones} ${logos} -i ${fondomar} ${framesUV} ${framesPress} ${frameSombra} -filter_complex ${filtro}  ${outputFile}
+ffmpeg -y -f image2 -i ${fondoPNG} ${framesViento} ${escalas} -f image2 -i  ${framescartel} ${opciones} ${logos} -i ${fondomar} ${framesUV} ${framesPress} ${frameSombra} -filter_complex ${filtro}  ${outputFile}
 #rm -rf ${dir}

@@ -208,6 +208,11 @@ function calcularMinMax {
     local fechamax=$3  #max
     local step=$4
 
+    local zminlocal=999999
+    local zmaxlocal=-999999
+    zmin=${zminlocal}
+    zmax=${zmaxlocal}
+
     while [ ${fecha} -le ${fechamax} ]
     do
 

@@ -209,13 +209,14 @@ function pintarPresionAyBGlobal {
 # 	     echo ${coordenadas}
 ##         exit
 
-        letra=`echo ${line} | awk '{print $4}'`
-        color=`awk -v letra=${letra} 'BEGIN{print (letra=="A")?"blue":"red"}'`
-        presion=`echo ${line} | awk '{print $3}'`
+        local fade=`echo ${line} | awk '{print $5}'`
+        local letra=`echo ${line} | awk '{print $4}'`
+        local color=`awk -v letra=${letra} 'BEGIN{print (letra=="A")?"blue":"red"}'`
+        local presion=`echo ${line} | awk '{print $3}'`
 
-        x=`echo ${coordenadas} | awk '{print $1}'`
-        y=`echo ${coordenadas} | awk '{print $2}'`
-        transformacion=`echo ${coordenadas} | awk '{print $3,$4,$5,$6}'`
+        local x=`echo ${coordenadas} | awk '{print $1}'`
+        local y=`echo ${coordenadas} | awk '{print $2}'`
+        local transformacion=`echo ${coordenadas} | awk '{print $3,$4,$5,$6}'`
 
         read xsizetemp ysizetemp < <(echo ${transformacion} | tr " " "\n" | awk -F "," -v xsize=${xsizeicono} -v ysize=${ysizeicono} \
         '{xsize=($3>xsize)?$3:xsize; ysize=($4>ysize)?$4:ysize;} END {print xsize,ysize}')
@@ -225,7 +226,7 @@ function pintarPresionAyBGlobal {
         convert -size ${xsizetemp}x${ysizetemp} xc:none -font Roboto-Bold -pointsize 75 -fill "${color}" -gravity center -annotate +0+25 "${letra}" \
          -pointsize 35 -fill "${color}" -gravity center -annotate +0-30 "${presion}" \
           -matte -virtual-pixel transparent -mattecolor none -distort Perspective "${transformacion}"\
-           \( +clone -background none -shadow 70x1-${dpx}+${dpy} \) +swap -flatten miff:- |\
+           \( +clone -background none -shadow 70x1-${dpx}+${dpy} \) +swap -flatten -channel a -evaluate multiply ${fade} miff:- |\
          composite -geometry +${x}+$((${y})) - ${tmpFile} png32:${tmpFile}
 
 #        echo $nicono
@@ -253,15 +254,16 @@ function pintarPresionAyBNormal {
          -v w=${xlength} -v h=${ylength} -v xsize=${xsize} -v ysize=${ysize} \
           '{printf "%d %d\n",$1*xsize/w-xsizeicono/2,ysize-$2*ysize/h-ysizeicono/2}')
 
-        letra=`echo ${line} | awk '{print $4}'`
-        color=`awk -v letra=${letra} 'BEGIN{print (letra=="A")?"blue":"red"}'`
-        presion=`echo ${line} | awk '{print $3}'`
+        local letra=`echo ${line} | awk '{print $4}'`
+        local color=`awk -v letra=${letra} 'BEGIN{print (letra=="A")?"blue":"red"}'`
+        local presion=`echo ${line} | awk '{print $3}'`
+        local fade=`echo ${line} | awk '{print $5}'`
 
         #Colocamos el icono dentro de la imagen principal
         convert -size ${xsizeicono}x${ysizeicono} xc:none -font Roboto-Bold \
           -pointsize 75 -fill "${color}" -gravity center -annotate +0+25 "${letra}" \
           -pointsize 35 -fill "${color}" -gravity center -annotate +0-30 "${presion}" \
-           \( +clone -background none -shadow 70x1-1+1 \) +swap -flatten miff:- |\
+           \( +clone -background none -shadow 70x1-1+1 \) +swap -flatten -channel a -evaluate multiply ${fade} miff:- |\
            composite -geometry +${x}+$((${y})) - ${tmpFile} png32:${tmpFile}
 
     done <  ${TMPDIR}/contourlabels.txt

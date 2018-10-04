@@ -10,15 +10,24 @@
 #source cfg/europa2.cfg
 #source cfg/global2.cfg
 source defaults.cfg
-source cfg/mapa3.cfg
+source geogcfg/globalapunt2.cfg
 #source cfg/semiglobalpacifico.cfg
 source funciones.sh
 source funciones-variables.sh
 source variables.sh
-source estilos/meteored2.cfg
-#source estilos/apunt.cfg
+#source estilos/meteored2.cfg
+source estilos/apunt.cfg
 
-ylength=`awk -v xlength=${xlength} -v xsize=${xsize} -v ysize=${ysize} 'BEGIN{printf "%.4f\n",xlength*ysize/xsize}'`
+#fecha=201809261500
+#LANG=${idioma} TZ=:Europe/Madrid date -d @$(date  -u -d "${fecha:0:8} ${fecha:8:2}" +%s) +"%A %d, %H:00" | sed -e "s/\b\(.\)/\u\1/g"
+#exit
+
+if [ ! -z ${global} ] && [  ${global} -eq 1 ]
+then
+    ylength=`awk -v xlength=${xlength} -v xsize=${xsize} -v ysize=${ysize} 'BEGIN{printf "%.4f\n",xlength*ysize/xsize}'`
+else
+    ylength=`gmt mapproject ${J} ${R} -W | awk '{print $2}'`
+fi
 
 #
 width=`echo ${J} | sed 's/-J.*\/\(.*\)c/\1/'`
@@ -41,9 +50,11 @@ awk -v scale=${scale} -f newlatlon.awk | awk '{print $1,$2; print $3,$4}' | gmt 
 
 pintarViento=1
 pintarIntensidad=1
-pintarPresion=0
+pintarPresion=1
 
-escalaViento=1
+escalaViento=0
+
+cptViento="cpt/v10m_201404.cpt"
 
 #titulo="Viento en superficie"
 titulo="Prec, nieve y presión"
@@ -52,12 +63,21 @@ titulo="Prec, nieve y presión"
 
 fechapasada=201803150000
 
-min=201803150100
+min=201809270000
+max=201809270300
 #max=201808010300
 #max=201809052100
-max=201803160000
-max=201803150300
+#max=201803170000
+max=201809300000
 #max=201808310300
+min=$2
+max=$3
+
+#### Esto hay que revisarlo
+fechapasada="${min:0:8}0000"
+
+fechalimite=`date -u --date="${fechapasada:0:8} ${fechapasada:8:2} +72 hours" +%Y%m%d%H%M`
+echo $fechapasada $fechalimite
 
 ## Si es precipitación prevista y corresponde al dato de un paso de tiempo (múltiplo de 3)
 #if [ ${esprecipitacion} -eq 1 ] && [ ${esprecacum} -eq 0 ] && [ $(( $(echo ${min:8:2}| awk '{print int($0)}')%3 )) -eq 0 ]
@@ -85,6 +105,41 @@ slowmotion=2
 nframes=20
 nframes=1
 #ncFile="2018031515.nc"
+
+
+nsteps=$(( (`date -u -d "${max:0:8} ${max:8:4}" +%s`-`date -u -d "${min:0:8} ${min:8:4}" +%s`)/(3600*3) ))
+[ ${nsteps} -ge 1 ] && nstepsinicio=2 || nstepsinicio=1
+nsteps=$((${nsteps}-${nstepsinicio}+1))
+
+pintarAnotacionesFinal=0
+nframesfinal=10
+
+colorAnotacion="white"
+
+
+
+
+source cfg/${1}.cfg
+
+#if [ ! -z $5 ]
+#then
+    titulo=$5
+#fi
+echo $5 ${titulo}
+
+if [ ${minreal} -eq ${min} ] && [ ${desfasemin} -ne 0 ]
+then
+    minreal=`date -u -d "${min:0:8} ${min:8:4} +${desfasemin} hours" +%Y%m%d%H00`
+fi
+
+
+
+if [ ${colorfronteras} == "white" ]
+then
+    fronterasPNG=${fronterasPNGw}
+
+fi
+
 nframesinicio=${nframes}
 
 if [ ${nframesinicio} -lt $((${slowmotion}*180/${mins}-${desfasemin}*${slowmotion}*60/${mins})) ]
@@ -99,6 +154,12 @@ fi
 
 echo ${nframes} ${nframesinicio}
 
+nsteps=$(( (`date -u -d "${max:0:8} ${max:8:4}" +%s`-`date -u -d "${min:0:8} ${min:8:4}" +%s`)/(3600*3) ))
+[ ${nsteps} -ge 1 ] && nstepsinicio=2 || nstepsinicio=1
+nsteps=$((${nsteps}-${nstepsinicio}+1))
+
+nframefinal=$((${nsteps}*${nframes}+${nframesloop}+${nframesinicio}*${nstepsinicio}))
+
 
 
 umbralPREC=0.5
@@ -110,7 +171,8 @@ TMPDIR="/tmp"
 
 OUTPUTS_DIR="/home/juan/Proyectos/pruebas/gmt/OUTPUTS/"
 outputFile="${OUTPUTS_DIR}/viento-meteored2.mkv"
-outputFile="${OUTPUTS_DIR}/vientopruebaescalas-meteored.mkv"
+outputFile="${OUTPUTS_DIR}/villena/acumnievespain-meteored.mkv"
+outputFile="${OUTPUTS_DIR}/$4"
 
 
 # Diretorio temporal
@@ -126,6 +188,9 @@ touch ${errorsFile}
 
 ########## COMIENZO
 
+
+
+#exit
 #if [ ${pintarPresion} -eq 1 ]
 #then
 #
@@ -142,10 +207,10 @@ touch ${errorsFile}
 JGEOG=${J}
 RGEOG=${R}
 
-variablesanimacion=("nubes" "prec" "nieve")
-nombresvariables=("Nubes" "Lluvia" "Nieve")
-
-indexescala=(1 2)
+#variablesanimacion=("nubes" "prec" "nieve")
+#nombresvariables=("Nubes" "Lluvia" "Nieve")
+#
+#indexescala=(1 2)
 opcionesEntrada=""
 
 if [ ${pintarIntensidad} -eq 1 ]
@@ -172,7 +237,10 @@ then
         #echo ${variablesprocesar[*]}
         for funcion in ${funcionesprocesar}
         do
-            echo ${nvar}
+#            echo ${nvar}
+            maxvariable=`date -u --date="${fechapasada:0:8} ${fechapasada:8:2} +${maxalcancevariables[${nvar}]} hours" +%Y%m%d%H%M`
+            [ ${maxvariable} -gt ${max} ] && maxvariable=${max};
+
             if [ ${#variablesprocesar[*]} -gt 0 ]
             then
                  variable=${variablesprocesar[${nvar}]}
@@ -183,7 +251,7 @@ then
             function procesarGrid {
                 ${funcion}
             }
-            procesarGrids ${variable} ${min} ${max}
+            procesarGrids ${variable} ${min} ${maxvariable}
         done
 
 
@@ -211,18 +279,18 @@ then
         if [ ${esprecipitacion} -eq 1 ]
         then
 
-            interpolarPREC ${variablefondo} ${min} ${max}
+            interpolarPREC ${variablefondo} ${min} ${max} ${fechapasada}
             stepinterp=1
 
-    #        if [ ${esprecacum} -eq 0 ] ##################
-    #        then
-    ###            minimo=`date -u --date="${min:0:8} ${min:8:2} +1 hours" +%Y%m%d%H%M`
-    ##            cp ${TMPDIR}/${variablefondo}002.png ${TMPDIR}/${variablefondo}001.png
-    ##            cp ${TMPDIR}/${variablefondo}002.png ${TMPDIR}/${variablefondo}000.png
-    #        fi
         fi
 
-        interpolarFrames "${variablefondo}" ${min} ${max} ${mins} ${stepinterp}
+        if [ ${mins} -lt $((${stepinterp}*60)) ]
+        then
+            interpolarFrames "${variablefondo}" ${min} ${max} ${mins} ${stepinterp}
+        fi
+
+        generarFrames "${variablefondo}" ${min} ${max} ${mins} ${stepinterp}
+
         if [ ${estransparente} -eq 1 ]
         then
             black2transparentFrames "${variablefondo}"
@@ -289,6 +357,9 @@ then
     }
 
     interpolarFrames "msl" ${min} ${max} ${mins} 3
+
+    generarFrames "msl" ${min} ${max} ${mins} 3
+
     replicarFrames "msl"
 
 
@@ -299,12 +370,14 @@ then
 
     printMessage "Calculando máximos/mínimos de MSL desde ${min} hasta ${max}"
     umbral=0.2
+    umbral=0.5
     # Filtramos los máximos A y lo mínimos B quitando aquellos que aparezcan menos frames de nminframes. Esto evita que aparezcan A y B que aparecen y desaparecen rapidamente
     paste <(awk '{print $1"\t"$2"\t"$3}' ${TMPDIR}/maxmins.txt) <(awk '{print $2,$3,$4,$5}' ${TMPDIR}/maxmins.txt | gmt mapproject ${J} ${R}) > ${TMPDIR}/maxmins2.txt
     awk -v umbral=${umbral} -f filtrarpresion.awk ${TMPDIR}/maxmins2.txt > ${TMPDIR}/maxmins3.txt
     awk -v mins=${mins} -v n=${nminframes} -f letrasconsecutivas.awk ${TMPDIR}/maxmins3.txt | sort -k1,1 |\
      awk -v N=5 -v nf=4  -v maxfecha=${max} -v minfecha=${minreal} -f suavizarletras.awk> ${TMPDIR}/maxmins4.txt
 
+#exit
     filelines=`wc -l ${TMPDIR}/maxmins4.txt | awk '{print $1}'`
 
     fecha=${min}
@@ -382,11 +455,11 @@ then
 
 
 
-    if [ ${pintarIntensidad} -eq 1 ]
-    then
-        cptGMT="white"
-    fi
-    cptGMT="cpt/v10m_201404.cpt"
+#    if [ ${pintarIntensidad} -eq 1 ]
+#    then
+#        cptGMT="white"
+#    fi
+#    cptGMT="cpt/v10m_201404.cpt"
 
 
 
@@ -423,7 +496,7 @@ then
 
     paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulas.txt | gmt mapproject ${RGEOG} ${JGEOG} | ${comando} )\
      <(awk '{print $3,$4}' ${TMPDIR}/dparticulas.txt | gmt mapproject ${RGEOG} ${JGEOG} | ${comando} ) \
-     <(awk -fz2color.awk <(gmt makecpt -Fr -C${cptGMT})  ${TMPDIR}/dparticulas.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
+     <(awk -fz2color.awk <(gmt makecpt -Fr -C${cptViento})  ${TMPDIR}/dparticulas.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
      awk -v w=${w} -v h=${h} '{printf "stroke %s line %d,%d %d,%d\n", $5, 1920*$1/w, 1080*(h-$2)/h, 1920*$3/w, 1080*(h-$4)/h}' > ${TMPDIR}/lineas.txt
 
 
@@ -484,6 +557,11 @@ then
             nframesfecha=$((${nframesfecha}+${nframesloop}-1))
         fi
 
+        if [ ${fecha} -eq ${max} ]
+        then
+            nframesfecha=$((${nframesfecha}+${nframesfinal}))
+        fi
+
         printMessage "Generando ${nframesfecha} frames para fecha ${fecha}"
 
         for ((i=0; i<${nframesfecha}; i++, nframe++))
@@ -535,7 +613,7 @@ then
 
              paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulas.txt | gmt mapproject ${RGEOG} ${JGEOG} | ${comando})\
             <(awk '{print $3,$4}' ${TMPDIR}/dparticulas.txt | gmt mapproject ${RGEOG} ${JGEOG} | ${comando}) \
-            <(awk -fz2color.awk <(gmt makecpt -Fr -C${cptGMT}) ${TMPDIR}/dparticulas.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
+            <(awk -fz2color.awk <(gmt makecpt -Fr -C${cptViento}) ${TMPDIR}/dparticulas.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
             awk -v w=${w} -v h=${h} '{printf "stroke %s line %d,%d %d,%d\n", $5, 1920*$1/w, 1080*(h-$2)/h, 1920*$3/w, 1080*(h-$4)/h}' > ${TMPDIR}/lineas.txt
 
 
@@ -606,7 +684,7 @@ then
         indexescala[${index}]=${ivar}
         cargarVariable "uv"
 #        calcularMinMax "${variablefondo}" ${min} ${max} ${stepinterp}
-        printMessage "Generando Escala a partir de ${zmin}/${zmax} con fichero CPT ${cptGMT}"
+        printMessage "Generando Escala a partir de ${zmin}/${zmax} con fichero CPT ${cptViento}"
         P=""
 
         echo ${tipoescala[*]}
@@ -615,7 +693,7 @@ then
         then
             P="-p"
         fi
-        ./crearescala.sh ${zmin}/${zmax} ${cptGMT} ${TMPDIR}/escala${ivar}.png  ${unidadEscala} "Viento" ${P} #2>> ${errorsFile}
+        ./crearescala.sh ${zmin}/${zmax} ${cptViento} ${TMPDIR}/escala${ivar}.png  ${unidadEscala} "Viento" ${P} #2>> ${errorsFile}
     fi
 
 #    exit
@@ -633,7 +711,8 @@ while [ ${fecha} -le ${fechamax} ]
 do
     outputpng=${TMPDIR}/rotulo-`printf "%03d\n" ${nframerotulo}`.png
 
-    rotuloFecha=`LANG=${idioma} TZ=:Europe/Madrid date -d @$(date  -u -d "${fecha:0:8} ${fecha:8:2}" +%s) +"%A %d, %H:00" | sed -e "s/\b\(.\)/\u\1/g"`
+    rotuloFecha=`LANG=${idioma} TZ=:Europe/Madrid date -d @$(date  -u -d "${fecha:0:8} ${fecha:8:2}" +%s) +"%A %d, %H:00" | sed -e "s/\b\(.*\)/\u\1/g"`
+    echo ${idioma} ${rotuloFecha}
     printMessage "Generando frame con el texto para la fecha ${fecha}"
 
     convert -font ${fuentetitulo} -pointsize ${tamtitulo} -fill "${colortitulo}" -annotate +${xtitulo}+${ytitulo} "${titulo}" -page ${xboxtitulo}x${yboxtitulo} -gravity ${aligntitulo} \( -size 1920x1080 xc:transparent \) png32:${outputpng}
@@ -682,6 +761,38 @@ do
     fi
 done
 
+
+
+
+echo "####################### ${pintarAnotacionesFinal}"
+if [ ${pintarAnotacionesFinal} -eq 1 ]
+then
+    cargarVariable ${variablefinal}
+
+    if [ ! -f ${TMPDIR}/${max}_${variablefinal}.nc ]
+    then
+        J=${JGEOG}
+        R=${RGEOG}
+        function procesarGrid {
+                ${funcionesprocesar}
+        }
+        procesarGrids ${variablefinal} ${max} ${max}
+        J="-JX${xlength}c/${ylength}c"
+        R=`grdinfo ${dataFileDST} -Ir -C` ####
+    fi
+
+#    calcularMaximos ${max} ${variablefinal} 10 10 #"ES"
+#    calcularMinimos ${max} ${variablefinal} 100 0 #"ES"
+#    calcularMinimosDanas ${max} #${variablefinal} 100 0 #"ES"
+    calcularAnotaciones
+    awk -v unidad=${unidadEscala} '{printf "%s %s %s %s\n",$1,$2,$3,unidad}' ${TMPDIR}/Tlabels.txt > ${TMPDIR}/KKlabels.txt
+    mv ${TMPDIR}/KKlabels.txt ${TMPDIR}/Tlabels.txt
+    pintarAnotaciones ${TMPDIR}/Tlabels.txt
+fi
+
+
+
+
 #Ponemos los rotulos
 
 opciones=" -f image2 -i ${TMPDIR}/rotulo-001.png"
@@ -690,7 +801,7 @@ ffinal=$(( ${nframesinicio}+${nframesloop} -1 ))
 
 
 #Fondo del mar
-filtro="[$((${nframerotulo}+${nlogos}+${pintarViento}+${nescalas}+1))]loop=-1[mar];[mar][0]overlay[out];"
+filtro="[$((${nframerotulo}+${nlogos}+${pintarViento}+${nescalas}+1))]loop=-1[mar];[mar]trim=start_frame=0:end_frame=$((${nframefinal}+${nframesfinal}))[mar];[mar][0]overlay[out];"
 
 if [ ${pintarViento} -eq 1 ]
 then
@@ -711,21 +822,28 @@ framesUV=""
 if [ ${pintarIntensidad} -eq 1 ]
 then
 #    filtro="[1]fade=in:$((${nframesloop}-15)):15[viento];[$((${nframerotulo}+${nlogos}+4))]fade=in:$((${nframesloop}-15)):15[uv];[0][uv]overlay[out];[out][viento]overlay[out];"
-    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarViento}+${nescalas}+2))]fade=in:$((${nframesloop}-15)):15[uv];[out][uv]overlay=shortest=1[out];"
+    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarViento}+${nescalas}+2))]fade=in:$((${nframesloop}-15)):15[uv];[out][uv]overlay[out];"
     framesUV="-f image2 -i ${TMPDIR}/${variablefondo}%03d.png"
     echo ${var}
 fi
 
 if [ ${pintarViento} -eq 1 ]
 then
-    filtro="${filtro}[out][viento]overlay=shortest=1[out];"
+    filtro="${filtro}[out][viento]overlay[out];"
 fi
 
 
 if [ ${pintarPresion} -eq 1 ]
 then
-    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarIntensidad}+${pintarViento}+${nescalas}+2))]fade=in:$((${nframesloop}-15)):15[press];[out][press]overlay=shortest=1[out];"
+    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarIntensidad}+${pintarViento}+${nescalas}+2))]fade=in:$((${nframesloop}-15)):15[press];[out][press]overlay[out];"
     framesPress="-f image2 -i ${TMPDIR}/msl%03d.png"
+fi
+
+if [ ${pintarAnotacionesFinal} -eq 1 ]
+then
+
+    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarIntensidad}+${pintarPresion}+${pintarViento}+${nescalas}+${global}+2))]setpts=1*PTS+${nframefinal}/(25*TB)[anotaciones];[out][anotaciones]overlay[out];"
+    framesanotaciones="-f image2 -i ${TMPDIR}/anot%03d.png"
 fi
 
 #
@@ -775,6 +893,11 @@ do
         j=$((${j}+1))
     fi
 
+    if [ ${i} -eq $((${nframerotulo}-1)) ]
+    then
+        ffinal=$((${ffinal}+${nframesfinal}))
+    fi
+
     filtro="${filtro}[out];[out][$((${i}+${nescalas}+${pintarViento}+1))]overlay=enable=between(n\,${finicial}\,${ffinal})"
 
 done
@@ -814,5 +937,6 @@ done
 
 echo $filtro
 
-ffmpeg -y -f image2 -i ${fondoPNG} ${framesViento} ${escalas} -f image2 -i  ${framescartel} ${opciones} ${logos} -i ${fondomar} ${framesUV} ${framesPress} ${frameSombra} -filter_complex ${filtro}  ${outputFile}
+ffmpeg -y -f image2 -i ${fondoPNG} ${framesViento} ${escalas} -f image2 -i  ${framescartel} ${opciones} ${logos} -i ${fondomar} ${framesUV} ${framesPress} ${frameSombra} ${framesanotaciones} -filter_complex ${filtro}  ${outputFile}
 #rm -rf ${dir}
+

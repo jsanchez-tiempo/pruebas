@@ -237,7 +237,7 @@ function checkDIRS () {
     checkdir ${DIRLOGOS}
     checkdir ${DIRFONDOS}
     checkdir ${DIRFRONTERAS}
-    checkdir ${CFGDIR}
+    checkdir ${GEOGCFGDIR}
     checkdir ${CPTDIR}
     checkdir ${GLOBEDIR}
 
@@ -359,24 +359,24 @@ function colorBalance () {
 
 }
 
-# Función que dado un codigo de país, comunidad autónoma o provincia vuelca las coordenadas de sus poligonos en un fichero
-# Parámetros:
-#   $1: Fichero donde se guardan las coordenadas de la región
-#   $2: Código de región
-function buscarFrontera () {
-    local file=$1
-    local cod=$2
-
-    array=(`echo ${cod} | tr '.' ' '`)
-    if [ ${#array[@]} -eq 1 ]
-    then
-        ogr2ogr -where "ISO2='${cod}'" -f "GMT" ${file} ${DIRFRONTERAS}/gadm28_adm0.shp
-    else
-        i=$((${#array[@]}-1))
-        ogr2ogr -where "HASC_${i}='${cod}'" -f "GMT" ${file} ${DIRFRONTERAS}/gadm28_adm${i}.shp
-    fi
-
-}
+## Función que dado un codigo de país, comunidad autónoma o provincia vuelca las coordenadas de sus poligonos en un fichero
+## Parámetros:
+##   $1: Fichero donde se guardan las coordenadas de la región
+##   $2: Código de región
+#function buscarFrontera () {
+#    local file=$1
+#    local cod=$2
+#
+#    array=(`echo ${cod} | tr '.' ' '`)
+#    if [ ${#array[@]} -eq 1 ]
+#    then
+#        ogr2ogr -where "ISO2='${cod}'" -f "GMT" ${file} ${DIRFRONTERAS}/gadm28_adm0.shp
+#    else
+#        i=$((${#array[@]}-1))
+#        ogr2ogr -where "HASC_${i}='${cod}'" -f "GMT" ${file} ${DIRFRONTERAS}/gadm28_adm${i}.shp
+#    fi
+#
+#}
 
 cd `dirname $0`
 
@@ -508,7 +508,7 @@ outputSombraPNG="${TMPDIR}/${outputFile}sombra.png" # Fichero de sombra (solo gl
 
 
 # Definición del ficheros de configuración
-cfgFile=${CFGDIR}/${outputFile}.cfg
+cfgFile=${GEOGCFGDIR}/${outputFile}.cfg
 
 # Si existe preguntamos si se quiere sobreescribir
 if [ -f ${cfgFile} ]&&[ ${OVERWRITE} -eq 0 ]
@@ -565,10 +565,12 @@ if [ ! -z ${resolucion} ]
 then
     printMessage "Resolución elegida: ${resformat}"
     GLOBEFILE="${GLOBEDIR}/globe${resformat}.grd"
+#    RELIEFFILE="${GLOBEDIR}/relief${resformat}.grd"
     if [ ! -f ${GLOBEFILE} ]
     then
         printMessage "Generando fichero ${GLOBEFILE} a ${resformat} desde ${GLOBEFILESOURCE}"
         ${GMT} grdsample ${GLOBEFILESOURCE} -I${resformat} -G${GLOBEFILE}
+#        ${GMT} grdgradient ${GLOBEFILE} -Ne0.5 -A0 -fg -G${RELIEFFILE}
     fi
 else
     if [ ! -f ${GLOBEFILE} ]
@@ -612,6 +614,7 @@ read lonmax latmax < <(awk -v w=${xlength} -v h=${ylength} -v wamp=${xlengthamp}
 if [ -z ${GLOBEFILE} ]
 then
     GLOBEFILE="${GLOBEDIR}/globe${resformat}.grd"
+#    RELIEFFILE="${GLOBEDIR}/relief${resformat}.grd"
     if [ ! -f ${GLOBEFILE} ]
     then
         ficherosglobe=`ls -1 ${GLOBEDIR} |  sed -n '/globe.*.grd/p'`
@@ -631,6 +634,7 @@ then
                 fi
             fi
             ${GMT} grdsample ${GLOBEFILESOURCE} -I${resformat} -G${GLOBEFILE}
+#            ${GMT} grdgradient ${GLOBEFILE} -Ne0.5 -A0 -fg -G${RELIEFFILE}
 
         fi
 
@@ -714,7 +718,8 @@ then
 fi
 
 # Pintamos el fichero GLOBE
-${GMT} grdimage  -Q -E${dpi} ${J} ${R} ${X} ${Y} ${GLOBEFILE} -C${CPTGLOBE} --PS_MEDIA="${w}cx${h}c" -P -K -O >> ${tmpPS}
+#${GMT} grdimage   -Q -E${dpi} ${J} ${R} ${X} ${Y} ${GLOBEDIR}/kk.grd -I${GLOBEDIR}/kk2.grd -C${CPTGLOBE} --PS_MEDIA="${w}cx${h}c" -P -K -O >> ${tmpPS}
+${GMT} grdimage   -Q -E${dpi} ${J} ${R} ${X} ${Y} ${GLOBEFILE} -C${CPTGLOBE} --PS_MEDIA="${w}cx${h}c" -P -K -O >> ${tmpPS}
 
 
 
@@ -883,3 +888,11 @@ printMessage "¡Se han generado los mapas con exito!"
 
 
 rm -rf ${TMPDIR}; rm -f ${outputPS}
+
+
+# Semiglobal hemisferio norte
+#./MapaBase3.sh -5 47 -z 9.4  -f global3 -s fondos/fondomar2.mp4 -o --ydes=-278
+# Europa
+#./MapaBase3.sh -5 47 -z 4.5  -f europa3 -s fondos/fondomar2.mp4 -o
+# España
+#./MapaBase3.sh -4.7 40 -z 1.25  -f spain3 -s fondos/fondomar2.mp4 -o -c ES

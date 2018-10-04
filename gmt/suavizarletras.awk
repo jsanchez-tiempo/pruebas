@@ -74,16 +74,22 @@ END{
 
 				}
 				#fade=1
+				fadein=1
+				fadeout=1
+				indexminfecha=j-nf;
 				for(z=j; z>=j-nf+1; z--)
 					if(array[cod][z]["fecha"]==minfecha)
 						indexminfecha=z;
 					else if(array[cod][z]["fecha"]==0)
 						break;
 
+
 				if(z>=indexminfecha)
 					fadein=(j-z)/nf;
 
+				#print indexminfecha,z,j, fadein
 
+                indexmaxfecha=j+nf+1
 				for(z=j; z<j+nf; z++)
 					if(array[cod][z]["fecha"]==maxfecha)
 						indexmaxfecha=z;
@@ -99,7 +105,7 @@ END{
 
 				fade=(fadein<fadeout)?fadein:fadeout;
 
-   					
+
 				printf "%s %.8f %.8f %s %s %s %s %s %.4f\n",array[cod][j]["fecha"],acumX/N,acumY/N,array[cod][j]["x"],array[cod][j]["y"],array[cod][j]["pres"],array[cod][j]["tipo"],cod,fade;
 			}	
 		}

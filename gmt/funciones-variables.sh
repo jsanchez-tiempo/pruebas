@@ -4,12 +4,20 @@
 function cargarVariable {
     var=$1
 
-#    index="${var}"
+
     funcionesprocesar=${variables[${var},fprocesar]}
     variablesprocesar=(${variables[${var},variables]})
-#    function procesarGrid {
-#        ${variables[${var},fprocesar]}
-#    }
+    maxalcancevariables=(${variables[${var},maxalcance]})
+    if [ ${#maxalcancevariables[*]} -eq 0 ]
+    then
+        i=0
+        for funcion in "${funcionesprocesar}" #((i=0;i<${#variablesprocesar[*]};i++))
+        do
+            maxalcancevariables[$i]=9999
+            i=$(( $i+1 ))
+        done
+    fi
+
     function pintarVariable {
         ${variables[${var},fpintar]} $1
     }
@@ -36,13 +44,22 @@ function pintarGH500 {
 
     dataFile=$1
 
-    gmt grdimage ${dataFile}  -Qg4 -E300 ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile}
+    [ ! -z ${dpi} ] && E="-E${dpi}"
+    gmt grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile}
 
-    gmt grdcontour ${dataFile} -S500 -J -R  -W1p,gray25 -A+552+f8p -K -O >> ${tmpFile}
+#    gmt grdcontour ${dataFile} -S500 -J -R  -W1p,gray25 -A+552+f8p -K -O >> ${tmpFile}
+    gmt grdcontour ${dataFile}  -S500 -J -R  -W1p,gray25 -C+552 -K -O >> ${tmpFile}
 
 
 }
 
+function procesarT500 {
+    cdo -sellevel,500 -selvar,t ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${errorsFile}
+
+    gmt grdconvert -Rd ${dataFileDST}\?t ${dataFileDST} 2>> ${errorsFile}
+    gmt grdmath ${Rgeog} ${dataFileDST} 273.15 SUB = ${dataFileDST} 2>> ${errorsFile}
+
+}
 
 function procesarT850 {
     cdo -sellevel,850 -selvar,t ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${errorsFile}
@@ -50,14 +67,24 @@ function procesarT850 {
     gmt grdconvert -Rd ${dataFileDST}\?t ${dataFileDST} 2>> ${errorsFile}
     gmt grdmath ${Rgeog} ${dataFileDST} 273.15 SUB = ${dataFileDST} 2>> ${errorsFile}
 
+
 }
 
 
 function pintarT850 {
     dataFile=$1
 
-    gmt grdimage ${dataFile}  -Qg4 -E300 ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile} #-t70
+    [ ! -z ${dpi} ] && E="-E${dpi}"
+    gmt grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile} #-t70
 }
+
+function pintarT500 {
+    dataFile=$1
+
+    [ ! -z ${dpi} ] && E="-E${dpi}"
+    gmt grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile} #-t70
+}
+
 
 
 
@@ -67,6 +94,14 @@ function procesarViento {
         gmt grdsample ${Rgeog}  ${dataFileDST} -I${resolucion}  -G${dataFileDST}
 
 }
+
+function procesarRachasViento {
+        gmt grdmath  ${TMPDIR}/${fecha}.nc\?u10 SQR ${TMPDIR}/${fecha}.nc\?v10 SQR ADD SQRT 3.6 MUL = ${dataFileDST}
+        gmt grdconvert -Rd ${dataFileDST} ${dataFileDST}
+        gmt grdcut ${Rgeog}  ${dataFileDST} -G${dataFileDST}
+
+}
+
 
 
 function pintarViento {
@@ -83,10 +118,10 @@ function pintarViento {
 function pintarPresion {
 
     dataFile=$1
-    color="white"
-        color="gray35"
-    disobaras=2
-    detiquetas=4
+#    color="white"
+#        color="gray35"
+#    disobaras=2
+#    detiquetas=4
 
     disobaras=5
     detiquetas=5
@@ -100,7 +135,7 @@ function pintarPresion {
     # Pintar las isobaras de presión
 #    gmt grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb19
     gmt grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb19 -Nr
-    gmt grdcontour ${TMPDIR}/kk -Q200 -S100 ${J} ${R} -W1p,white -C${disobaras} -W${color} -K -O >> ${tmpFile}
+    gmt grdcontour ${TMPDIR}/kk -Q200 -S100 ${J} ${R} -W1p,white -C${disobaras} -W${colorisobaras} -K -O >> ${tmpFile}
 
 #    disobaras=1
 #    detiquetas=5
@@ -212,6 +247,7 @@ function pintarPresionAyBGlobal {
         local fade=`echo ${line} | awk '{print $5}'`
         local letra=`echo ${line} | awk '{print $4}'`
         local color=`awk -v letra=${letra} 'BEGIN{print (letra=="A")?"blue":"red"}'`
+#        local color=`awk -v letra=${letra} 'BEGIN{print (letra=="A")?"rgb(0,255,255)":"rgb(247,62,56)"}'`
         local presion=`echo ${line} | awk '{print $3}'`
 
         local x=`echo ${coordenadas} | awk '{print $1}'`
@@ -296,7 +332,8 @@ function procesarNubes {
 function pintarNubes {
 
     dataFile=$1
-    gmt grdimage ${dataFile} ${J} ${R} ${X} ${Y} -Q -C${cptGMT} -nc+c -E${dpi} -K -O >> ${tmpFile}
+    [ ! -z ${dpi} ] && E="-E${dpi}"
+    gmt grdimage ${dataFile} ${J} ${R} ${X} ${Y} -Q -C${cptGMT} -nc+c ${E} -K -O >> ${tmpFile}
 
 }
 
@@ -318,8 +355,8 @@ function procesarPREC {
             gmt grdconvert -Rd ${TMPDIR}/${fecha}.nc\?${variable} ${dataFile}
             gmt grdmath ${dataFile} 1000 MUL = ${dataFile}
 
-#            # Pasamos el grid a la resolución deseada para que pueda coger el fichero de relieve
-#            gmt grdsample ${Rgeog} ${dataFile} -I${resolucion} -G${dataFile}
+            # Pasamos el grid a la resolución deseada para que pueda coger el fichero de relieve
+#           gmt grdsample ${Rgeog} ${dataFile} -I${resolucion} -G${dataFile}
             gmt grdcut ${Rgeog} ${dataFile}  -G${dataFile}
         fi
         if [ ! -f ${dataFileDST} ]; then
@@ -328,6 +365,15 @@ function procesarPREC {
             gmt grdmath ${dataFileDST} ${dataFile} ADD = ${dataFileDST}
         fi
     done
+
+    if [ ${dataFileDST} == ${dataFileMin} ]
+    then
+        dataFileMin=${TMPDIR}/min${vardst}.nc
+        cp ${dataFileDST} ${dataFileMin}
+    fi
+    gmt grdmath ${dataFileDST} ${dataFileMin} SUB = ${dataFileDST}
+
+
 
 }
 
@@ -387,10 +433,15 @@ function pintarPREC {
 
     dataFile=$1
 
+#    umbralPREC=-10
+#    gmt grdclip -Sb${umbralPREC}/NaN ${dataFile} -G${TMPDIR}/kk
+    gmt makecpt -C${cptGMT} -Fr | awk -v umbral=${umbralPREC} '$1>=umbral{print $0}' > ${TMPDIR}/kk.cpt
 
-    gmt grdclip -Sb${umbralPREC}/NaN ${dataFile} -G${TMPDIR}/kk
+    tcolor=`sed -n '/^B/p' ${TMPDIR}/kk.cpt | tr "/" "," | awk '{printf "rgb(%s)",$2}'`
 
-    gmt grdimage ${TMPDIR}/kk -Qg4 -E300 -J -R -C${cptGMT} -nc+c -K -O >> ${tmpFile}
+
+    [ ! -z ${dpi} ] && E="-E${dpi}"
+    gmt grdimage ${dataFile} -Qg4 ${E} -J -R -C${TMPDIR}/kk.cpt -nc+c -K -O >> ${tmpFile}
 
 }
 

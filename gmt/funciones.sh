@@ -143,14 +143,33 @@ function printMessage {
 
 
 
+function checkGrids {
+    local fecha=$1  #min
+    local fechamax=$2  #max
+    local fechapasada=$3
+
+    local dataFile
+
+    printMessage "Chequeando que existen grids desde ${fecha} hasta ${fechamax}"
+    while [ ${fecha} -le ${fechamax} ]
+    do
+        dataFile="${DIRNETCDF}/${fechapasada:0:10}/${fecha:0:10}.nc"
+        [ ! -f ${dataFile} ] && ( echo "Error: No se ha encontrado el fichero ${dataFile}" >&2; exit 1 )
+        ln -sf ${dataFile} ${TMPDIR}/${fecha}.nc
+
+        fecha=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
+    done
+}
+
 
 function procesarGrids {
 
-    fecha=$2  #min
-    fechamax=$3  #max
-    vardst=$1
+    local fecha=$2  #min
+    local fechamax=$3  #max
+    local vardst=$1
+    local fechapasada=$4
 
-    nargs=$(($#-4))
+    local nargs=$(($#-4))
 
     for ((i=0; i<=${nargs}; i++))
     do
@@ -179,7 +198,8 @@ function procesarGrids {
         done
 
 
-        ln -sf ~/ECMWF/${fecha:0:10}.nc ${TMPDIR}/${fecha}.nc
+#        ln -sf ~/ECMWF/${fecha:0:10}.nc ${TMPDIR}/${fecha}.nc
+#        ln -sf ${DIRNETCDF}/${fechapasada:0:10}/${fecha:0:10}.nc ${TMPDIR}/${fecha}.nc
 
         procesarGrid
 
@@ -187,41 +207,10 @@ function procesarGrids {
 
         if [ ! -z ${global} ] && [  ${global} -eq 1 ]
         then
-#            read w h < <(gmt mapproject ${J} ${R} -W)
-
-#            ylength=`awk -v xlength=${xlength} -v xsize=${xsize} -v ysize=${ysize} 'BEGIN{printf "%.4f\n",xlength*ysize/xsize}'`
-
-
             gmt grdcut ${dataFileDST} ${RAMP} -G${dataFileDST}   # 275/1080×14,0625=3.5807; 3.5807+2.4688=6.0495; 16.5313+2.4688=20.112
             gmt grdproject ${dataFileDST} -JX${xlength}/${ylength} ${RAMP} -G${dataFileDST} #
 
-
-
-##            echo $w $h
-#            grdcut -R0/${w}/`awk -v w=${w} 'BEGIN{printf "%.4f\n",w-w*0.68}'`/${w} ${dataFileDST} -G${dataFileDST}
-##            RAmp=`awk -v w=${w} 'BEGIN{a=(920/1080*w)/2; b=(920/1920*w)/2; printf "-R%.4f/%.4f/%.4f/%.4f\n",-b,w+b,-a,w+a}'`
-#            RAmp=`awk -v w=${w} 'BEGIN{h=w*0.68; a=1080*h/1000-h; b=(1920*w/(1000/0.68)-w)/2; printf "-R%.4f/%.4f/%.4f/%.4f\n",-b,w+b,w-w*0.68,w+a}'`
-#            hsemi=`awk -v h=${h} 'BEGIN{print h*0.68}'`
-#
-#            echo $RAmp
-#
-#            gmt grdproject -JX${w}c/${hsemi}c ${RAmp} ${dataFileDST} -G${dataFileDST}
-##            gmt grdedit ${dataFileDST} -R0/${w}/`awk -v h=${h} -v hsemi=${hsemi} 'BEGIN{print h-hsemi}'`/${h}
-#
-#
-##            grdcut -R0/${w}/`awk -v w=${w} 'BEGIN{printf "%.4f\n",w-w*0.68}'`/${w} ${dataFileDST} -G${dataFileDST}
         fi
-
-#        read zminlocal zmaxlocal < <(gmt grdinfo ${dataFileDST} -C | awk '{printf "%.0f %.0f\n",$6-0.5,$7+0.5}')
-#        if [ ${zminlocal} -lt ${zmin} ]
-#        then
-#            zmin=${zminlocal}
-#        fi
-#        if [ ${zmaxlocal} -gt ${zmax} ]
-#        then
-#            zmax=${zmaxlocal}
-#        fi
-
         fecha=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
 
     done
@@ -266,6 +255,10 @@ function calcularMinMax {
 
 
 function generarFrame {
+
+    local tcolor
+    local color2transparent
+
     gmt psbasemap ${R} ${J}  -B+n --PS_MEDIA="${xlength}cx${ylength}c" -Xc -Yc --MAP_FRAME_PEN="0p,black" -P -K > ${tmpFile}
 
     printMessage "Generando frame para fecha ${fecha}"
@@ -281,6 +274,7 @@ function generarFrame {
     inputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`.png
     outputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`-fhd.png
 
+#    echo "tcolor: ${tcolor}"
     [ ! -z ${tcolor} ] && color2transparent="-transparent ${tcolor}"
 
     convert ${color2transparent} -resize ${xsize}x${ysize}!  ${inputpng} png32:${outputpng}

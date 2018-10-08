@@ -1,26 +1,269 @@
 #!/bin/bash
+###############################################################################
+# Script que genera un vídeo con una animación ......
+# que los scripts de animación tomarán como base.
+# Se generan 4 archivos en formato PNG y uno con extensión CFG: 1 imagen con el
+# mapa completo, 1 imagen sin el fondo del mar, 1 imagen con las fronteras de
+# los continentes en negro, 1 imagen con las fronteras en blanco y el fichero
+# de configuración.
+#
+#
+# Uso:
+# animacion.sh tipo min max [-f archivo] [-t titulo] [-d fechapasada] [-g geogcfgfile] [-e stylecfgfile]
+#              [-v viento] [-p presion] [-m minutos] [-s slowmotion] [-o] [-h]
+#
+# Juan Sánchez Segura <jsanchez.tiempo@gmail.com>
+# Marcos Molina Cano <marcosmolina.tiempo@gmail.com>
+# Guillermo Ballester Valor <gbvalor@gmail.com>                      04/10/2018
+###############################################################################
+
+# Nombre del script.
+scriptName=`basename $0`
+
+
+# Función que define la ayuda sobre este script.
+function usage() {
+
+      tiposvideo=`ls ${CFGDIR} | awk 'NR>1{printf ",%s ",var}{"basename "$1" .cfg" |  getline var; }END{printf "y %s\n",var}' | sed 's/^,//'`
+      echo
+      echo "Genera un vídeo con una animación basada en las variables de los grids."
+      echo
+      echo "Uso:"
+      echo "${scriptName} tipo fechainicio fechafinal [-f archivo] [-t titulo] [-d fechapasada] [-g geogcfgfile]"
+      echo "                   [-e stylecfgfile] [-v viento] [-p presion] [-m minutos] [-s slowmotion] [-o] [-h]"
+      echo "                   [--nstart_frames nsframes] [--nend_frames neframes] [--nframes nframes] [--fadein fadein]"
+      echo
+      echo " tipo :           Tipo de vídeo que se va a generar. Se pueden configurar los tipos de vídeo en el directorio"
+      echo "                  ${CFGDIR}. Los tipos disponibles actualmente son:"
+      echo "                  ${tiposvideo}"
+      echo " fechainicio :    Fecha en la que comienza la animación del vídeo. En formato yyyyMMddhh (UTC)."
+      echo " fechafinal :     Fecha en la que finaliza la animación del vídeo. En formato yyyyMMddhh (UTC)."
+      echo " -f archivo:      Nombre del fichero de salida. Por defecto out.mkv"
+      echo " -t titulo:       Título que aparecerá en los rótulos del vídeo. Por defecto es el que viene configurado con"
+      echo "                  el tipo del vídeo."
+      echo " -d fechapasada:  Fecha de la pasada de la que se van a coger los grids de entrada. Por defecto se coge la"
+      echo "                  última pasada disponible que sea menor que la fecha de inicio. En formato yyyyMMddhh (UTC)."
+      echo " -g geogcfgfile:  Fichero de configuración geográfica. Se pueden generar con el script MapaBase3.sh."
+      echo "                  Por defecto spain3.cfg."
+      echo " -e stylecfgfile: Fichero de configuración de estilo. Configuración de los elementos que se van a mostrar en "
+      echo "                  en el vídeo. Por defecto meteored2.cfg"
+      echo " -v viento:       Indica si se van a mostrar las partículas del viento o no. Por defecto viene determinado por"
+      echo "                  la configuración de tipo. Puede ser 0 para deshabilitar y 1 para habilitarlo."
+      echo " -p presión:      Indica si se va a mostrar las isobaras y las letras de presión. Por defecto viene determinado por"
+      echo "                  la configuración de tipo. Puede ser 0 para deshabilitar y 1 para habilitarlo."
+      echo " -m minutos:      Minutos en los que se interpola un frame. Debe ser un divisor de 60. Un valor menor hace "
+      echo "                  que la animación haga una transición más suave pero la generación del vídeo será más lenta. Por "
+      echo "                  defecto viene determinado por la configuración de tipo."
+      echo " -s slowmotion:   Factor de ralentización de la animación. Debe ser un entero mayor o igual que 1. Por "
+      echo "                  defecto viene determinado por la configuración de tipo."
+      echo " -o:              Sobreescribe todos los ficheros sin preguntar si existen."
+      echo " -h:              Muestra esta ayuda."
+      echo
+      echo "El fichero default.cfg define las variables de configuración de este comando."
+
+
+}
+
+# Parsea los argumentos pasados al comando a través de la línea de comandos
+function parseOptions() {
+    OVERWRITE=0
+
+    if [ $# -eq 0 ]
+    then
+       echo "Error: el número de argumentos mínimo es 3" >&2; usage; exit 1
+    fi
+
+    if [ $1 != "-h" ]
+    then
+        if [ $# -lt 3 ]
+        then
+           echo "Error: el número de argumentos mínimo es 3" >&2; usage; exit 1
+        fi
+
+        # Expresiones regulares
+        refloat="^[+-]?[0-9]+([.][0-9]+)?$"
+        reint="^[+-]?[0-9]+$"
+        repos="^[0-9]+$"
+        refecha="^[0-9]{10}$"
+        rebin="^[0-1]{1}$"
+
+#        reres="^[0-9]+[m|s]+$"
+
+
+        # Chequeamos el tipo
+        tipo=$1;
+        [ ! -f ${CFGDIR}/${tipo}.cfg ] && { echo "Error: no existe el tipo ${tipo}" >&2; usage; exit 1; }
+        shift;
+
+        # Chequeamos la fecha de inicio
+        min=$1
+        min=`date -u -d "${min:0:8} ${min:8:2}" +%Y%m%d%H00 2> /dev/null`
+
+
+        [ $? -ne 0 ] || ! [[ $1 =~ ${refecha} ]] && { echo "Error: la fecha inicial $1 no tiene formato correcto" >&2; usage; exit 1; }
+        shift;
+
+        # Chequeamos la fecha de fin
+        max=$1
+        max=`date -u -d "${max:0:8} ${max:8:2}" +%Y%m%d%H00 2> /dev/null`
+
+        [ $? -ne 0 ] || ! [[  $1 =~ ${refecha} ]] && { echo "Error: la fecha final $1 no tiene formato correcto" >&2; usage; exit 1; }
+        shift;
+
+        [ ${max} -le ${min} ] && { echo "Error: la fecha final debe ser mayor que la fecha inicial" >&2; usage; exit 1; }
+
+    fi
+
+
+    # Chequeamos el resto de opciones
+    options=$(getopt -o hf:t:d:g:e:v:p:m:s:o --long nend_frames: --long nstart_frames: --long nframes: --long fadein: --long border: -- "$@")
+
+    if [ $? -ne 0 ]
+    then
+        usage; exit 1
+    fi
+
+
+    # set -- opciones: cambia los parametros de entrada del script por los especificados en opciones y en ese orden. la opción "--"
+    # hace que tenga en cuenta tambien los argumentos que empiezan por "-" (sino los omite).
+    eval set -- "${options}"
+
+    while true; do
+        case "$1" in
+        -f)
+            shift
+            outputFile=$1
+            ;;
+        -t)
+            shift
+            tituloParam=$1
+#            echo $titulo
+            ;;
+        -d)
+            shift
+            fechapasada=$1
+            fechapasada=`date -u -d "${fechapasada:0:8} ${fechapasada:8:2}" +%Y%m%d%H00 2> /dev/null`
+            [ $? -ne 0 ] || ! [[  $1 =~ ${refecha} ]] && \
+                { echo "Error: la fecha de pasada $1 no tiene formato correcto" >&2; usage; exit 1; }
+            [ ${fechapasada} -gt ${min} ] && \
+                { echo "Error: la fecha de pasada debe ser menor o igual que la fecha inicial" >&2; usage; exit 1; }
+            [ ! -d "${DIRNETCDF}/${fechapasada:0:10}" ] && \
+                { echo "Error: No existe un directorio para la fecha de pasada ${fechapasada}" >&2; usage; exit 1; }
+            ;;
+        -g)
+            shift
+            geogfile="${GEOGCFGDIR}/$1"
+            [ ! -f "${geogfile}" ] && \
+                { echo "Error: No existe el fichero de configuración geográfica ${geogfile}" >&2; usage; exit 1; }
+            ;;
+        -e)
+            shift
+            stylefile=${DIRESTILOS}/$1
+            [ ! -f "${stylefile}" ] && \
+                { echo "Error: No existe el fichero de configuración de estilo ${stylefile}" >&2; usage; exit 1; }
+            ;;
+        -v)
+            shift
+            pintarVientoParam=$1
+            ! [[ ${pintarVientoParam} =~ ${rebin} ]] && \
+                { echo "Error: El valor viento debe ser 0 o 1." >&2; usage; exit 1; }
+            ;;
+        -p)
+            shift
+            pintarPresionParam=$1
+            ! [[ ${pintarPresionParam} =~ ${rebin} ]] && \
+                { echo "Error: El valor presión debe ser 0 o 1." >&2; usage; exit 1; }
+            ;;
+        -m)
+            shift
+            minsParam=$1
+            ! [[ ${minsParam} =~ ${repos} ]] || [ $(( 60 % ${minsParam} )) -ne 0 ] && \
+                { echo "Error: El valor mins debe entero positivo y divisor de 60." >&2; usage; exit 1; }
+            ;;
+        -s)
+            shift
+            slowmotionParam=$1
+            ! [[ ${slowmotionParam} =~ ${repos} ]] || [ ${slowmotionParam} -lt 1 ] && \
+                { echo "Error: El valor slowmotion debe entero positivo y mayor que 1." >&2; usage; exit 1; }
+            ;;
+        --nstart_frames)
+            shift
+            nframesloopParam=$1
+            ! [[ ${nframesloopParam} =~ ${repos} ]] || [ ${nframesloopParam} -lt 1 ]|| [ ${nframesloopParam} -gt 60 ] && \
+            { echo "Error: El valor --nstart_frames debe entero positivo entre 1 y 60." >&2; usage; exit 1; }
+            ;;
+        --nend_frames)
+            shift
+            nframesfinalParam=$1
+            ! [[ ${nframesfinalParam} =~ ${repos} ]] || [ ${nframesfinalParam} -gt 60 ] && \
+            { echo "Error: El valor --nend_frames debe entero positivo entre 0 y 60." >&2; usage; exit 1; }
+            ;;
+        --nframes)
+            shift
+            nframesParam=$1
+            ! [[ ${nframesParam} =~ ${repos} ]] || [ ${nframesParam} -lt 1 ] || [ ${nframesParam} -gt 60 ] && \
+            { echo "Error: El valor --nframes debe entero positivo entre 1 y 60." >&2; usage; exit 1; }
+            ;;
+        --fadein)
+            shift
+            fadeinParam=$1
+            ! [[ ${fadeinParam} =~ ${repos} ]] || [ ${fadeinParam} -gt 60 ] && \
+            { echo "Error: El valor --fadein debe entero positivo entre 0 y 60." >&2; usage; exit 1; }
+            ;;
+        --border)
+            shift
+            borderParam=${1,,}
+            [ ${borderParam} != "black" ] && [ ${borderParam} != "white" ] && \
+            { echo "Error: El valor --border debe ser 'black' o 'white' ." >&2; usage; exit 1; }
+            ;;
+        -o)
+            OVERWRITE=1
+            ;;
+        -h)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+#        *)
+#            echo "Error: No existe la opción $1." >&2;
+#            usage;
+#            exit 1;
+#            ;;
+        esac
+        shift
+    done
+}
 
 
 
 
 
-
-#source cfg/spain2.cfg
-#source cfg/cvalenciana2.cfg
-#source cfg/europa2.cfg
-#source cfg/global2.cfg
 source defaults.cfg
-source geogcfg/globalapunt2.cfg
-#source cfg/semiglobalpacifico.cfg
 source funciones.sh
 source funciones-variables.sh
 source variables.sh
-#source estilos/meteored2.cfg
-source estilos/apunt.cfg
 
-#fecha=201809261500
-#LANG=${idioma} TZ=:Europe/Madrid date -d @$(date  -u -d "${fecha:0:8} ${fecha:8:2}" +%s) +"%A %d, %H:00" | sed -e "s/\b\(.\)/\u\1/g"
-#exit
+
+parseOptions "$@"
+
+[ -z ${geogfile} ] && geogfile="${GEOGCFGDIR}/spain3.cfg"
+[ -z ${stylefile} ] && stylefile="${DIRESTILOS}/meteored2.cfg"
+
+source ${geogfile}
+source ${stylefile}
+#source estilos/apunt.cfg
+
+
+
+
+
+
+
+
+
 
 if [ ! -z ${global} ] && [  ${global} -eq 1 ]
 then
@@ -30,11 +273,11 @@ else
 fi
 
 #
-width=`echo ${J} | sed 's/-J.*\/\(.*\)c/\1/'`
+#width=`echo ${J} | sed 's/-J.*\/\(.*\)c/\1/'`
 #R="-R-2.96/4.96/37.615/41.06"
 max_age=50
 #nparticulas=$((${width}*50))
-nparticulas=`awk -v w=${width} -v n=50 'BEGIN{printf "%d",w*n}'`
+nparticulas=`awk -v w=${xlength} -v n=50 'BEGIN{printf "%d",w*n}'`
 fade=7.5
 #scale=200
 scale=400
@@ -42,8 +285,8 @@ scale=400
 
 # Ajusta la escala a las dimensiones del mapa
 # Tomamos como buena la escala de 400 en las dimensiones del mapa de España (0.00596105)
-read w h < <(gmt mapproject ${J} ${R} -W)
-scale=`awk -v w=${w} -v h=${h} 'BEGIN{printf "%.2f %.2f 1 1\n",w/2,h/2}' | gmt mapproject ${J} ${R} -I |\
+#read w h < <(gmt mapproject ${J} ${R} -W)
+scale=`awk -v w=${xlength} -v h=${ylength} 'BEGIN{printf "%.2f %.2f 1 1\n",w/2,h/2}' | gmt mapproject ${J} ${R} -I |\
 awk -v scale=${scale} -f newlatlon.awk | awk '{print $1,$2; print $3,$4}' | gmt mapproject -J -R |\
  awk -v scale=${scale} 'NR==1{x1=$1; y1=$2}NR==2{print 0.00596105/sqrt(($1-x1)^2+($2-y1)^2)*scale}'`
 
@@ -56,34 +299,19 @@ escalaViento=0
 
 cptViento="cpt/v10m_201404.cpt"
 
-#titulo="Viento en superficie"
-titulo="Prec, nieve y presión"
-#titulo="VENT SUPERFÍCIE"
+
+titulo="Mi video"
 
 
-fechapasada=201803150000
+# Si no se ha especificado una cogemos el directorio de pasada con fecha más actualizada que sea menor que el mínimo
+[ -z ${fechapasada} ] && \
+    fechapasada="`ls -d ${DIRNETCDF}/*/ | awk '{system("basename "$1)}' | sort -n | awk -v min=${min:0:10} '$1<=min' | tail -n 1`00"
 
-min=201809270000
-max=201809270300
-#max=201808010300
-#max=201809052100
-#max=201803170000
-max=201809300000
-#max=201808310300
-min=$2
-max=$3
 
-#### Esto hay que revisarlo
-fechapasada="${min:0:8}0000"
+#fechalimite=`date -u --date="${fechapasada:0:8} ${fechapasada:8:2} +72 hours" +%Y%m%d%H%M`
 
-fechalimite=`date -u --date="${fechapasada:0:8} ${fechapasada:8:2} +72 hours" +%Y%m%d%H%M`
-echo $fechapasada $fechalimite
 
-## Si es precipitación prevista y corresponde al dato de un paso de tiempo (múltiplo de 3)
-#if [ ${esprecipitacion} -eq 1 ] && [ ${esprecacum} -eq 0 ] && [ $(( $(echo ${min:8:2}| awk '{print int($0)}')%3 )) -eq 0 ]
-#then
-#    min=`date -u --date="${min:0:8} ${min:8:2} +1 hours" +%Y%m%d%H%M`
-#fi
+
 
 minreal=${min}
 min=${minreal:0:8}`printf "%02d" $(( $(echo ${min:8:2}|awk '{print int($0)}')/3*3 ))`00
@@ -102,9 +330,10 @@ steprotulo=1
 
 slowmotion=2
 #slowmotion=10
-nframes=20
+#nframes=20
 nframes=1
 #ncFile="2018031515.nc"
+fadein=15
 
 
 nsteps=$(( (`date -u -d "${max:0:8} ${max:8:4}" +%s`-`date -u -d "${min:0:8} ${min:8:4}" +%s`)/(3600*3) ))
@@ -118,15 +347,35 @@ colorAnotacion="white"
 
 
 
+# Cargamos las variables según el tipo seleccionado
+source cfg/${tipo}.cfg
 
-source cfg/${1}.cfg
+# Modificamos las variables según los parámetros pasados
+[ ! -z "${tituloParam}" ] && titulo="${tituloParam}"
+[ ! -z ${pintarVientoParam} ] && pintarViento=${pintarVientoParam}
+[ ! -z ${pintarPresionParam} ] && pintarPresion=${pintarPresionParam}
+[ ! -z ${minsParam} ] && mins=${minsParam}
+[ ! -z ${slowmotionParam} ] && slowmotion=${slowmotionParam}
+[ ! -z ${nframesfinalParam} ] && nframesfinal=${nframesfinalParam}
+[ ! -z ${nframesloopParam} ] && nframesloop=${nframesloopParam}
+[ ! -z ${nframesParam} ] && nframes=${nframesParam}
+[ ! -z ${fadeinParam} ] && fadein=${fadeinParam}
+if [ ! -z ${borderParam} ]
+then
+    if [ ${borderParam} == "black" ]
+    then
+        fronterasPNG=${fronterasPNGb}
+    else
+        fronterasPNG=${fronterasPNGw}
+    fi
+fi
 
-#if [ ! -z $5 ]
-#then
-    titulo=$5
-#fi
-echo $5 ${titulo}
+[ ${fadein} -gt ${nframesloop} ] && \
+{ echo "Error: El valor --fadein (${fadein}) no puede ser mayor que el valor --nstart_frames (${nframesloop})." >&2; usage; exit 1; }
 
+
+# Si el cfg del tipo se especifica un desfase distinto de 0 ajustamos el mínimo real a ese desfase.
+# Por ejemplo en precipitación prevista
 if [ ${minreal} -eq ${min} ] && [ ${desfasemin} -ne 0 ]
 then
     minreal=`date -u -d "${min:0:8} ${min:8:4} +${desfasemin} hours" +%Y%m%d%H00`
@@ -170,9 +419,9 @@ TMPDIR="/tmp"
 #CPTFILE="cpt/windapunt.cpt"
 
 OUTPUTS_DIR="/home/juan/Proyectos/pruebas/gmt/OUTPUTS/"
-outputFile="${OUTPUTS_DIR}/viento-meteored2.mkv"
-outputFile="${OUTPUTS_DIR}/villena/acumnievespain-meteored.mkv"
-outputFile="${OUTPUTS_DIR}/$4"
+#outputFile="${OUTPUTS_DIR}/viento-meteored2.mkv"
+#outputFile="${OUTPUTS_DIR}/villena/acumnievespain-meteored.mkv"
+#outputFile="${OUTPUTS_DIR}/$4"
 
 
 # Diretorio temporal
@@ -180,37 +429,31 @@ TMPDIR=${TMPDIR}/`basename $(type $0 | awk '{print $3}').$$`
 #TMPDIR=/tmp/animViento.sh.12766
 mkdir -p ${TMPDIR}
 
+# Definimos que el script pare si se captura alguna señal de terminación o se produce algún error
+trap "rm -rf ${TMPDIR}; echo 'error: señal interceptada. Saliendo' >&2;exit 1" 1 2 3 15
+trap "echo 'error: ha fallado la ejecución. Saliendo' >&2;exit 1" ERR
+
 
 
 errorsFile="${TMPDIR}/errors.txt"
 touch ${errorsFile}
 
 
+
+
+
+
 ########## COMIENZO
-
-
-
-#exit
-#if [ ${pintarPresion} -eq 1 ]
-#then
-#
-#    function procesarGrid {
-#        procesarPresion
-#    }
-#    printMessage "Procesando los grids de Presión (msl) desde ${fecha} hasta ${fechamax}"
-#
-#    procesarGrids "msl" ${min} ${max}
-#
-#fi
 
 
 JGEOG=${J}
 RGEOG=${R}
 
-#variablesanimacion=("nubes" "prec" "nieve")
-#nombresvariables=("Nubes" "Lluvia" "Nieve")
-#
-#indexescala=(1 2)
+maxcheck=${max}
+[ ${pintarRachasViento} -eq 1 ] && maxcheck=`date -u --date="${max:0:8} ${max:8:2} +3 hours" +%Y%m%d%H%M`
+
+checkGrids ${min} ${maxcheck} ${fechapasada}
+
 opcionesEntrada=""
 
 if [ ${pintarIntensidad} -eq 1 ]
@@ -251,7 +494,7 @@ then
             function procesarGrid {
                 ${funcion}
             }
-            procesarGrids ${variable} ${min} ${maxvariable}
+            procesarGrids ${variable} ${min} ${maxvariable} ${fechapasada}
         done
 
 
@@ -346,7 +589,7 @@ then
     }
     printMessage "Procesando los grids de Presión (msl) desde ${fecha} hasta ${fechamax}"
 
-    procesarGrids "msl" ${min} ${max}
+    procesarGrids "msl" ${min} ${max} ${fechapasada}
 
 
     J="-JX${xlength}c/${ylength}c"
@@ -361,7 +604,6 @@ then
     generarFrames "msl" ${min} ${max} ${mins} 3
 
     replicarFrames "msl"
-
 
 
     nminframes=$(( (`date -u -d "${max:0:8} ${max:8:4}" +%s`-`date -u -d "${min:0:8} ${min:8:4}" +%s`)/(${mins}*60*2) ))
@@ -474,6 +716,15 @@ then
     gmt grdcut ${ncFile}?u10 ${Rgeog} -G${ncFileU}
     gmt grdcut ${ncFile}?v10 ${Rgeog} -G${ncFileV}
 
+    if [ ${pintarRachasViento} -eq 1 ]
+    then
+        fechasig=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
+        gmt grdmath ${Rgeog} ${TMPDIR}/${fecha}.nc\?u10 SQR ${TMPDIR}/${fecha}.nc\?v10 SQR ADD SQRT  = ${TMPDIR}/vientomedio.nc
+        gmt grdmath ${Rgeog} ${TMPDIR}/${fechasig}.nc\?fg310 = ${TMPDIR}/vientoracha.nc
+        gmt grdmath ${TMPDIR}/vientoracha.nc ${TMPDIR}/vientomedio.nc DIV ${ncFileU} MUL = ${ncFileU}
+        gmt grdmath ${TMPDIR}/vientoracha.nc ${TMPDIR}/vientomedio.nc DIV ${ncFileV} MUL = ${ncFileV}
+    fi
+
 
     awk '{print $1,$2}' ${TMPDIR}/particulas.txt | gmt grdtrack -G${ncFileU} -G${ncFileV} | awk -v scale=${scale}  -f newlatlon.awk > ${TMPDIR}/dparticulas.txt
 
@@ -539,10 +790,19 @@ then
         ncFileU="${TMPDIR}/${fecha}_u.nc"
         ncFileV="${TMPDIR}/${fecha}_v.nc"
 
-    #    gmt grdcut ${ncFile}?u10 ${Rgeog} -G${ncFileU}
-    #    gmt grdcut ${ncFile}?v10 ${Rgeog} -G${ncFileV}
-        ncFileU=${ncFile}?u10
-        ncFileV=${ncFile}?v10
+        gmt grdcut ${ncFile}?u10 ${Rgeog} -G${ncFileU}
+        gmt grdcut ${ncFile}?v10 ${Rgeog} -G${ncFileV}
+#        ncFileU=${ncFile}?u10
+#        ncFileV=${ncFile}?v10
+
+        if [ ${pintarRachasViento} -eq 1 ]
+        then
+            fechasig=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
+            gmt grdmath ${Rgeog} ${TMPDIR}/${fecha}.nc\?u10 SQR ${TMPDIR}/${fecha}.nc\?v10 SQR ADD SQRT  = ${TMPDIR}/vientomedio.nc
+            gmt grdmath ${Rgeog} ${TMPDIR}/${fechasig}.nc\?fg310 = ${TMPDIR}/vientoracha.nc
+            gmt grdmath ${TMPDIR}/vientoracha.nc ${TMPDIR}/vientomedio.nc DIV ${ncFileU} MUL = ${ncFileU}
+            gmt grdmath ${TMPDIR}/vientoracha.nc ${TMPDIR}/vientomedio.nc DIV ${ncFileV} MUL = ${ncFileV}
+        fi
 
         nframesfecha=${nframes}
         if [ ${fecha} -le ${sigmin} ]
@@ -776,7 +1036,7 @@ then
         function procesarGrid {
                 ${funcionesprocesar}
         }
-        procesarGrids ${variablefinal} ${max} ${max}
+        procesarGrids ${variablefinal} ${max} ${max} ${fechapasada}
         J="-JX${xlength}c/${ylength}c"
         R=`grdinfo ${dataFileDST} -Ir -C` ####
     fi
@@ -801,11 +1061,16 @@ ffinal=$(( ${nframesinicio}+${nframesloop} -1 ))
 
 
 #Fondo del mar
-filtro="[$((${nframerotulo}+${nlogos}+${pintarViento}+${nescalas}+1))]loop=-1[mar];[mar]trim=start_frame=0:end_frame=$((${nframefinal}+${nframesfinal}))[mar];[mar][0]overlay[out];"
+nframesmar=`ffmpeg -i ${fondomar} -vcodec copy -f rawvideo -y /dev/null 2>&1 | tr ^M '\n' | awk '/^frame=/ {print $2}'|tail -n 1`
+filtro="[$((${nframerotulo}+${nlogos}+${pintarViento}+${nescalas}+1))]loop=-1:${nframesmar}:0[mar];[mar]trim=start_frame=0:end_frame=$((${nframefinal}+${nframesfinal}))[mar];[mar][0]overlay[out];"
+
+
+fadefilter="fade=in:$((${nframesloop}-${fadein})):${fadein}"
+[ ${fadein} -eq 0 ] && fadefilter="copy"
 
 if [ ${pintarViento} -eq 1 ]
 then
-    filtro="${filtro}[1]fade=in:$((${nframesloop}-15)):15[viento];"
+    filtro="${filtro}[1]${fadefilter}[viento];"
     framesViento="-f image2 -i ${TMPDIR}/%03d.png"
 fi
 
@@ -822,7 +1087,7 @@ framesUV=""
 if [ ${pintarIntensidad} -eq 1 ]
 then
 #    filtro="[1]fade=in:$((${nframesloop}-15)):15[viento];[$((${nframerotulo}+${nlogos}+4))]fade=in:$((${nframesloop}-15)):15[uv];[0][uv]overlay[out];[out][viento]overlay[out];"
-    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarViento}+${nescalas}+2))]fade=in:$((${nframesloop}-15)):15[uv];[out][uv]overlay[out];"
+    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarViento}+${nescalas}+2))]${fadefilter}[uv];[out][uv]overlay[out];"
     framesUV="-f image2 -i ${TMPDIR}/${variablefondo}%03d.png"
     echo ${var}
 fi
@@ -835,7 +1100,7 @@ fi
 
 if [ ${pintarPresion} -eq 1 ]
 then
-    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarIntensidad}+${pintarViento}+${nescalas}+2))]fade=in:$((${nframesloop}-15)):15[press];[out][press]overlay[out];"
+    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarIntensidad}+${pintarViento}+${nescalas}+2))]${fadefilter}[press];[out][press]overlay[out];"
     framesPress="-f image2 -i ${TMPDIR}/msl%03d.png"
 fi
 

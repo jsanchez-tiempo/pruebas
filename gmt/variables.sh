@@ -8,7 +8,7 @@ variables[uv,cpt]="cpt/v10m_201404.cpt"
 variables[uv,unidad]="km/h"
 
 variables[uvracha,fprocesar]="procesarRachasViento"
-variables[uvracha,fpintar]="pintarRachasViento"
+variables[uvracha,fpintar]="pintarViento"
 variables[uvracha,cpt]="cpt/v10m_201404.cpt"
 variables[uvracha,unidad]="km/h"
 

@@ -96,7 +96,8 @@ function procesarViento {
 }
 
 function procesarRachasViento {
-        gmt grdmath  ${TMPDIR}/${fecha}.nc\?u10 SQR ${TMPDIR}/${fecha}.nc\?v10 SQR ADD SQRT 3.6 MUL = ${dataFileDST}
+        fechasig=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
+        gmt grdmath  ${TMPDIR}/${fechasig}.nc\?fg310 3.6 MUL = ${dataFileDST}
         gmt grdconvert -Rd ${dataFileDST} ${dataFileDST}
         gmt grdcut ${Rgeog}  ${dataFileDST} -G${dataFileDST}
 
@@ -135,6 +136,9 @@ function pintarPresion {
     # Pintar las isobaras de presión
 #    gmt grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb19
     gmt grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb19 -Nr
+
+    echo ${colorisobaras}
+    colorisobaras="white"
     gmt grdcontour ${TMPDIR}/kk -Q200 -S100 ${J} ${R} -W1p,white -C${disobaras} -W${colorisobaras} -K -O >> ${tmpFile}
 
 #    disobaras=1

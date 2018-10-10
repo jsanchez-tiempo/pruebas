@@ -34,8 +34,8 @@ function procesarGH500 {
 
     cdo -sellevel,500 -selvar,gh ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${dataFileDST}
 
-    gmt grdconvert -Rd ${dataFileDST}\?gh ${dataFileDST} 2>> ${errorsFile}
-    gmt grdmath ${Rgeog} ${dataFileDST} 9.81 DIV 10 DIV = ${dataFileDST} 2>> ${errorsFile}
+    ${GMT} grdconvert -Rd ${dataFileDST}\?gh ${dataFileDST} 2>> ${errorsFile}
+    ${GMT} grdmath ${Rgeog} ${dataFileDST} 9.81 DIV 10 DIV = ${dataFileDST} 2>> ${errorsFile}
 
 }
 
@@ -45,10 +45,10 @@ function pintarGH500 {
     dataFile=$1
 
     [ ! -z ${dpi} ] && E="-E${dpi}"
-    gmt grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile}
+    ${GMT} grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile}
 
 #    gmt grdcontour ${dataFile} -S500 -J -R  -W1p,gray25 -A+552+f8p -K -O >> ${tmpFile}
-    gmt grdcontour ${dataFile}  -S500 -J -R  -W1p,gray25 -C+552 -K -O >> ${tmpFile}
+    ${GMT} grdcontour ${dataFile}  -S500 ${J} ${R} -W1p,gray25 -C+552 -K -O >> ${tmpFile}
 
 
 }
@@ -56,16 +56,16 @@ function pintarGH500 {
 function procesarT500 {
     cdo -sellevel,500 -selvar,t ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${errorsFile}
 
-    gmt grdconvert -Rd ${dataFileDST}\?t ${dataFileDST} 2>> ${errorsFile}
-    gmt grdmath ${Rgeog} ${dataFileDST} 273.15 SUB = ${dataFileDST} 2>> ${errorsFile}
+    ${GMT} grdconvert -Rd ${dataFileDST}\?t ${dataFileDST} 2>> ${errorsFile}
+    ${GMT} grdmath ${Rgeog} ${dataFileDST} 273.15 SUB = ${dataFileDST} 2>> ${errorsFile}
 
 }
 
 function procesarT850 {
     cdo -sellevel,850 -selvar,t ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${errorsFile}
 
-    gmt grdconvert -Rd ${dataFileDST}\?t ${dataFileDST} 2>> ${errorsFile}
-    gmt grdmath ${Rgeog} ${dataFileDST} 273.15 SUB = ${dataFileDST} 2>> ${errorsFile}
+    ${GMT} grdconvert -Rd ${dataFileDST}\?t ${dataFileDST} 2>> ${errorsFile}
+    ${GMT} grdmath ${Rgeog} ${dataFileDST} 273.15 SUB = ${dataFileDST} 2>> ${errorsFile}
 
 
 }
@@ -75,31 +75,31 @@ function pintarT850 {
     dataFile=$1
 
     [ ! -z ${dpi} ] && E="-E${dpi}"
-    gmt grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile} #-t70
+    ${GMT} grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile} #-t70
 }
 
 function pintarT500 {
     dataFile=$1
 
     [ ! -z ${dpi} ] && E="-E${dpi}"
-    gmt grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile} #-t70
+    ${GMT} grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile} #-t70
 }
 
 
 
 
 function procesarViento {
-        gmt grdmath  ${TMPDIR}/${fecha}.nc\?u10 SQR ${TMPDIR}/${fecha}.nc\?v10 SQR ADD SQRT 3.6 MUL = ${dataFileDST}
-        gmt grdconvert -Rd ${dataFileDST} ${dataFileDST}
-        gmt grdsample ${Rgeog}  ${dataFileDST} -I${resolucion}  -G${dataFileDST}
+        ${GMT} grdmath  ${TMPDIR}/${fecha}.nc\?u10 SQR ${TMPDIR}/${fecha}.nc\?v10 SQR ADD SQRT 3.6 MUL = ${dataFileDST}
+        ${GMT} grdconvert -Rd ${dataFileDST} ${dataFileDST}
+        ${GMT} grdsample ${Rgeog}  ${dataFileDST} -I${resolucion}  -G${dataFileDST}
 
 }
 
 function procesarRachasViento {
         fechasig=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
-        gmt grdmath  ${TMPDIR}/${fechasig}.nc\?fg310 3.6 MUL = ${dataFileDST}
-        gmt grdconvert -Rd ${dataFileDST} ${dataFileDST}
-        gmt grdcut ${Rgeog}  ${dataFileDST} -G${dataFileDST}
+        ${GMT} grdmath  ${TMPDIR}/${fechasig}.nc\?fg310 3.6 MUL = ${dataFileDST}
+        ${GMT} grdconvert -Rd ${dataFileDST} ${dataFileDST}
+        ${GMT} grdcut ${Rgeog}  ${dataFileDST} -G${dataFileDST}
 
 }
 
@@ -108,7 +108,7 @@ function procesarRachasViento {
 function pintarViento {
 
     dataFile=$1
-    gmt grdimage ${dataFile} ${J} ${R} ${X} ${Y} -Q -C${cptGMT} -nc+c -E${dpi} -K -O >> ${tmpFile}
+    ${GMT} grdimage ${dataFile} ${J} ${R} ${X} ${Y} -Q -C${cptGMT} -nc+c -E${dpi} -K -O >> ${tmpFile}
 
 }
 
@@ -124,22 +124,18 @@ function pintarPresion {
 #    disobaras=2
 #    detiquetas=4
 
-    disobaras=5
-    detiquetas=5
 
-    normalmsl=1013
-    rango=2
-    lmsl=$((${normalmsl}-${rango}))
-    hmsl=$((${normalmsl}+${rango}))
+
+
 
 
     # Pintar las isobaras de presión
-#    gmt grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb19
-    gmt grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb19 -Nr
+#    ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb19
+    ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb19 -Nr
 
-    echo ${colorisobaras}
-    colorisobaras="white"
-    gmt grdcontour ${TMPDIR}/kk -Q200 -S100 ${J} ${R} -W1p,white -C${disobaras} -W${colorisobaras} -K -O >> ${tmpFile}
+#    echo ${colorisobaras}
+#    colorisobaras="white"
+    ${GMT} grdcontour ${TMPDIR}/kk -Q200 -S100 ${J} ${R} -W1p,white -C${disobaras} -W${colorisobaras} -K -O >> ${tmpFile}
 
 #    disobaras=1
 #    detiquetas=5
@@ -149,19 +145,19 @@ function pintarPresion {
 #    gmt grdcontour ${TMPDIR}/kk -J -R -A${detiquetas}+t"${TMPDIR}/contourlabels.txt" -T++a+d20p/1p+lLH  -Gn1/2c -C${disobaras} -K -O > /dev/null
 #    awk '{if ($4!="H" && $4!="L") print $1,$2,$4}' ${TMPDIR}/contourlabels.txt |  gmt pstext -J -R -F+f8p,Helvetica-Bold,black+a0  -G${color}  -K -O >> ${tmpFile}
 
-    gmt grdmath ${TMPDIR}/kk DUP EXTREMA 2 EQ MUL = ${TMPDIR}/kk2
-    gmt grdfilter ${TMPDIR}/kk2 -G${TMPDIR}/kk2 -Dp -Ffmconv.nc -Np
-    gmt grdmath  ${TMPDIR}/kk2 0 NAN = ${TMPDIR}/kk2
+    ${GMT} grdmath ${TMPDIR}/kk DUP EXTREMA 2 EQ MUL = ${TMPDIR}/kk2
+    ${GMT} grdfilter ${TMPDIR}/kk2 -G${TMPDIR}/kk2 -Dp -Ffmconv.nc -Np
+    ${GMT} grdmath  ${TMPDIR}/kk2 0 NAN = ${TMPDIR}/kk2
 
 
-    gmt grd2xyz -s ${TMPDIR}/kk2 | awk '{printf "%s %s %d\n",$1,$2,int($3*100+0.5)}' | sort -k3 -n -r |\
+    ${GMT} grd2xyz -s ${TMPDIR}/kk2 | awk '{printf "%s %s %d\n",$1,$2,int($3*100+0.5)}' | sort -k3 -n -r |\
      awk -v umbral=1.5 -f filtrarpresionmaxmin.awk | awk -v min=${hmsl} -v fecha=${fecha} '{press=$3/100; if (press>=min) printf "%s %s %s %d A\n",fecha,$1,$2,press}' >> ${TMPDIR}/maxmins.txt
 
-    gmt grdmath ${TMPDIR}/kk DUP EXTREMA -2 EQ MUL = ${TMPDIR}/kk2
-    gmt grdfilter ${TMPDIR}/kk2 -G${TMPDIR}/kk2 -Dp -Ffmconv.nc -Np
-    gmt grdmath  ${TMPDIR}/kk2 0 NAN = ${TMPDIR}/kk2
+    ${GMT} grdmath ${TMPDIR}/kk DUP EXTREMA -2 EQ MUL = ${TMPDIR}/kk2
+    ${GMT} grdfilter ${TMPDIR}/kk2 -G${TMPDIR}/kk2 -Dp -Ffmconv.nc -Np
+    ${GMT} grdmath  ${TMPDIR}/kk2 0 NAN = ${TMPDIR}/kk2
 
-    gmt grd2xyz -s ${TMPDIR}/kk2 | awk '{printf "%s %s %d\n",$1,$2,int($3*100+0.5)}' | sort -n -k3 |\
+    ${GMT} grd2xyz -s ${TMPDIR}/kk2 | awk '{printf "%s %s %d\n",$1,$2,int($3*100+0.5)}' | sort -n -k3 |\
      awk -v umbral=1.5 -f filtrarpresionmaxmin.awk | awk -v max=${lmsl} -v fecha=${fecha} '{press=$3/100; if (press<=max) printf "%s %s %s %d B\n",fecha,$1,$2,press}' >> ${TMPDIR}/maxmins.txt
 
 }
@@ -202,17 +198,17 @@ function pintarPresionAyBGlobal {
 
 
     read dlon dlat < <(awk -v dlon=${xlengthicono} -v dlat=${ylengthicono} -v w=${w} 'BEGIN{dlon=dlon/2; dlat=dlat/2; print w/2+dlon,w/2+dlat;}'\
-     | gmt mapproject ${RTemp} -JX${w}c/${w}c -I | gmt mapproject -Rd -JG0/0/${w} -I)
+     | ${GMT} mapproject ${RTemp} -JX${w}c/${w}c -I | ${GMT} mapproject -Rd -JG0/0/${w} -I)
 
 
 #    echo ${dlat} ${dlon}
 #    nicono=0
     # Creamos una imagen vacia transparente de tamaño fullhd
-    convert -size ${xsize}x${ysize} xc:transparent png32:${tmpFile}
+    ${CONVERT} -size ${xsize}x${ysize} xc:transparent png32:${tmpFile}
     while read line
     do
         # Calculamos las coordenadas geográficas de la letra
-        read lon lat < <(echo ${line} | awk '{print $1,$2}' | gmt mapproject ${RAMP} -JX${xlength}c/${ylength}c -I | gmt mapproject -Rd -JG0/0/${w}c -I)
+        read lon lat < <(echo ${line} | awk '{print $1,$2}' | ${GMT} mapproject ${RAMP} -JX${xlength}c/${ylength}c -I | ${GMT} mapproject -Rd -JG0/0/${w}c -I)
         # Calculamos el desplazamiento en pixeles de la sombra de la letra
         read dpx dpy < <(echo ${lon} ${lat} | awk -v d=${dsombraicono} '{deg2rad=3.141592/180; print int(sin($1*deg2rad)*d+0.5),int(sin($2*deg2rad)*d+0.5)}')
 
@@ -230,7 +226,7 @@ function pintarPresionAyBGlobal {
             print lon-dlon,latmax;\
             print lon+dlon,latmax;\
             print lon+dlon,latmin}' |\
-         gmt mapproject -Rd -JG0/0/${w}c | gmt mapproject ${RAMP}  -JX${xlength}c/${ylength}c  |\
+         ${GMT} mapproject -Rd -JG0/0/${w}c | ${GMT} mapproject ${RAMP}  -JX${xlength}c/${ylength}c  |\
          awk -v w=${xlength} -v h=${ylength} 'BEGIN{ xmin=1920; ymin=1080;}{\
                 punto[NR-1]["x"]=$1*1920/w;\
                 punto[NR-1]["y"]=1080-$2*1080/h;\
@@ -263,11 +259,11 @@ function pintarPresionAyBGlobal {
 #        echo ${xsizetemp} ${ysizetemp}
 
         #Realizamos la transformación geométrica y colocamos la letra en su posición
-        convert -size ${xsizetemp}x${ysizetemp} xc:none -font Roboto-Bold -pointsize 75 -fill "${color}" -gravity center -annotate +0+25 "${letra}" \
+        ${CONVERT} -size ${xsizetemp}x${ysizetemp} xc:none -font Roboto-Bold -pointsize 75 -fill "${color}" -gravity center -annotate +0+25 "${letra}" \
          -pointsize 35 -fill "${color}" -gravity center -annotate +0-30 "${presion}" \
           -matte -virtual-pixel transparent -mattecolor none -distort Perspective "${transformacion}"\
            \( +clone -background none -shadow 70x1-${dpx}+${dpy} \) +swap -flatten -channel a -evaluate multiply ${fade} miff:- |\
-         composite -geometry +${x}+$((${y})) - ${tmpFile} png32:${tmpFile}
+         ${COMPOSITE} -geometry +${x}+$((${y})) - ${tmpFile} png32:${tmpFile}
 
 #        echo $nicono
 #         cp ${tmpFile} ${TMPDIR}/${nicono}.png
@@ -286,7 +282,7 @@ function pintarPresionAyBNormal {
 
 
     # Creamos una imagen vacia transparente de tamaño fullhd
-    convert -size ${xsize}x${ysize} xc:transparent png32:${tmpFile}
+    ${CONVERT} -size ${xsize}x${ysize} xc:transparent png32:${tmpFile}
     while read line
     do
         #Calculamos la posición donde colocar el icono
@@ -300,11 +296,11 @@ function pintarPresionAyBNormal {
         local fade=`echo ${line} | awk '{print $5}'`
 
         #Colocamos el icono dentro de la imagen principal
-        convert -size ${xsizeicono}x${ysizeicono} xc:none -font Roboto-Bold \
+        ${CONVERT} -size ${xsizeicono}x${ysizeicono} xc:none -font Roboto-Bold \
           -pointsize 75 -fill "${color}" -gravity center -annotate +0+25 "${letra}" \
           -pointsize 35 -fill "${color}" -gravity center -annotate +0-30 "${presion}" \
            \( +clone -background none -shadow 70x1-1+1 \) +swap -flatten -channel a -evaluate multiply ${fade} miff:- |\
-           composite -geometry +${x}+$((${y})) - ${tmpFile} png32:${tmpFile}
+           ${COMPOSITE} -geometry +${x}+$((${y})) - ${tmpFile} png32:${tmpFile}
 
     done <  ${TMPDIR}/contourlabels.txt
 
@@ -319,17 +315,17 @@ function pintarPresionAyB {
 
 
 function procesarPresion {
-        gmt grdmath ${TMPDIR}/${fecha}.nc\?msl 100 DIV = ${dataFileDST}
-        gmt grdconvert -Rd ${dataFileDST} ${dataFileDST}
-        gmt grdsample ${Rgeog} -I0.5 ${dataFileDST}  -G${dataFileDST}
+        ${GMT} grdmath ${TMPDIR}/${fecha}.nc\?msl 100 DIV = ${dataFileDST}
+        ${GMT} grdconvert -Rd ${dataFileDST} ${dataFileDST}
+        ${GMT} grdsample ${Rgeog} -I0.5 ${dataFileDST}  -G${dataFileDST}
 }
 
 
 
 function procesarNubes {
 
-    gmt grdconvert -Rd ${TMPDIR}/${fecha}.nc\?tcc ${dataFileDST} 2>> ${errorsFile}
-    gmt grdcut ${Rgeog} ${dataFileDST}  -G${dataFileDST} 2>> ${errorsFile}
+    ${GMT} grdconvert -Rd ${TMPDIR}/${fecha}.nc\?tcc ${dataFileDST} 2>> ${errorsFile}
+    ${GMT} grdcut ${Rgeog} ${dataFileDST}  -G${dataFileDST} 2>> ${errorsFile}
 
 }
 
@@ -337,7 +333,7 @@ function pintarNubes {
 
     dataFile=$1
     [ ! -z ${dpi} ] && E="-E${dpi}"
-    gmt grdimage ${dataFile} ${J} ${R} ${X} ${Y} -Q -C${cptGMT} -nc+c ${E} -K -O >> ${tmpFile}
+    ${GMT} grdimage ${dataFile} ${J} ${R} ${X} ${Y} -Q -C${cptGMT} -nc+c ${E} -K -O >> ${tmpFile}
 
 }
 
@@ -348,7 +344,7 @@ function procesarPREC {
 #    variables="cp lsp"
 
     variables=$1
-    echo ${variables}
+#    echo ${variables}
 #    dataFileDST=`dirname ${ncFile}`/`basename ${ncFile} .nc`_acumprec.nc
 
     for variable in ${variables}
@@ -356,17 +352,17 @@ function procesarPREC {
         dataFile=${TMPDIR}/${fecha}_${variable}.nc
         if [ ! -f ${dataFile} ]; then
 
-            gmt grdconvert -Rd ${TMPDIR}/${fecha}.nc\?${variable} ${dataFile}
-            gmt grdmath ${dataFile} 1000 MUL = ${dataFile}
+            ${GMT} grdconvert -Rd ${TMPDIR}/${fecha}.nc\?${variable} ${dataFile}
+            ${GMT} grdmath ${dataFile} 1000 MUL = ${dataFile}
 
             # Pasamos el grid a la resolución deseada para que pueda coger el fichero de relieve
-#           gmt grdsample ${Rgeog} ${dataFile} -I${resolucion} -G${dataFile}
-            gmt grdcut ${Rgeog} ${dataFile}  -G${dataFile}
+#           ${GMT} grdsample ${Rgeog} ${dataFile} -I${resolucion} -G${dataFile}
+            ${GMT} grdcut ${Rgeog} ${dataFile}  -G${dataFile}
         fi
         if [ ! -f ${dataFileDST} ]; then
             cp ${dataFile} ${dataFileDST}
         else
-            gmt grdmath ${dataFileDST} ${dataFile} ADD = ${dataFileDST}
+            ${GMT} grdmath ${dataFileDST} ${dataFile} ADD = ${dataFileDST}
         fi
     done
 
@@ -375,7 +371,7 @@ function procesarPREC {
         dataFileMin=${TMPDIR}/min${vardst}.nc
         cp ${dataFileDST} ${dataFileMin}
     fi
-    gmt grdmath ${dataFileDST} ${dataFileMin} SUB = ${dataFileDST}
+    ${GMT} grdmath ${dataFileDST} ${dataFileMin} SUB = ${dataFileDST}
 
 
 
@@ -387,7 +383,7 @@ function procesarTasaPREC {
 
 #    variables="crr lsrr csfr lssfr"
     variables=$1
-    echo ${variables}
+#    echo ${variables}
 #    dataFileDST=`dirname ${ncFile}`/`basename ${ncFile} .nc`_acumprec.nc
 
     for variable in ${variables}
@@ -395,19 +391,19 @@ function procesarTasaPREC {
         dataFile=${TMPDIR}/${fecha}_${variable}.nc
         if [ ! -f ${dataFile} ]; then
 
-            gmt grdconvert -Rd ${TMPDIR}/${fecha}.nc\?${variable} ${dataFile}
-            #gmt grdmath ${dataFile} 3600 MUL = ${dataFile}
+            ${GMT} grdconvert -Rd ${TMPDIR}/${fecha}.nc\?${variable} ${dataFile}
+            #${GMT} grdmath ${dataFile} 3600 MUL = ${dataFile}
 
             # Pasamos el grid a la resolución deseada para que pueda coger el fichero de relieve
 
-#            gmt grdsample ${Rgeog} ${dataFile} -I${resolucion} -G${dataFile}
-            gmt grdcut ${Rgeog} ${dataFile} -G${dataFile}
-            gmt grdclip -Sb0/0 ${dataFile} -G${dataFile}
+#            ${GMT} grdsample ${Rgeog} ${dataFile} -I${resolucion} -G${dataFile}
+            ${GMT} grdcut ${Rgeog} ${dataFile} -G${dataFile}
+            ${GMT} grdclip -Sb0/0 ${dataFile} -G${dataFile}
         fi
         if [ ! -f ${dataFileDST} ]; then
             cp ${dataFile} ${dataFileDST}
         else
-            gmt grdmath ${dataFileDST} ${dataFile} ADD = ${dataFileDST}
+            ${GMT} grdmath ${dataFileDST} ${dataFile} ADD = ${dataFileDST}
         fi
     done
 
@@ -437,15 +433,13 @@ function pintarPREC {
 
     dataFile=$1
 
-#    umbralPREC=-10
-#    gmt grdclip -Sb${umbralPREC}/NaN ${dataFile} -G${TMPDIR}/kk
-    gmt makecpt -C${cptGMT} -Fr | awk -v umbral=${umbralPREC} '$1>=umbral{print $0}' > ${TMPDIR}/kk.cpt
+    ${GMT} makecpt -C${cptGMT} -Fr | awk -v umbral=${umbralPREC} '$1>=umbral{print $0}' > ${TMPDIR}/kk.cpt
 
     tcolor=`sed -n '/^B/p' ${TMPDIR}/kk.cpt | tr "/" "," | awk '{printf "rgb(%s)",$2}'`
 
 
     [ ! -z ${dpi} ] && E="-E${dpi}"
-    gmt grdimage ${dataFile} -Qg4 ${E} -J -R -C${TMPDIR}/kk.cpt -nc+c -K -O >> ${tmpFile}
+    ${GMT} grdimage ${dataFile} -Qg4 ${E} ${J} ${R} -C${TMPDIR}/kk.cpt -nc+c -K -O >> ${tmpFile}
 
 }
 

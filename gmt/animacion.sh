@@ -1011,6 +1011,213 @@ then
     fi
 fi
 
+pintarOlasMar=0
+# Pintamos las olas del mar
+if [ ${pintarOlasMar} -eq 1 ]
+then
+
+    zmin=9999
+    zmax=-9999
+
+
+    ### PRIMER FRAME
+
+    # w y h son el ancho y el alto cartesiano de la proyección (que no tiene porque coincidir con el de la imagen
+    # que estemos pintando)
+    read w h < <(${GMT} mapproject ${JGEOG} ${RGEOG} -W)
+
+    x=12.5
+    y=12.5
+    read lon lat < <(echo ${x} ${y} | ${GMT} mapproject ${JGEOG} ${RGEOG} -I)
+
+
+
+    fecha=${min}
+    fechamax=${max}
+
+
+    ncFile="2018051112P.nc"
+    ncFileMOD="${TMPDIR}/${fecha}_shww.nc"
+    ncFileANG="${TMPDIR}/${fecha}_mdww.nc"
+
+    # Recortamos la región deseada
+    ${GMT} grdcut ${ncFile}?shww ${Rgeog} -G${ncFileMOD}
+    ${GMT} grdcut ${ncFile}?mdww ${Rgeog} -G${ncFileANG}
+
+
+
+
+    # Para cada partícula sacamos su componentes U y V y a través de ellas y de sus coordenadas calculamos el nuevo punto donde se va a situar
+    awk '{print $1,$2}' ${TMPDIR}/particulas.txt | ${GMT} grdtrack -G${ncFileU} -G${ncFileV} | awk -v scale=${scale}  -f newlatlon.awk > ${TMPDIR}/dparticulas.txt
+
+    echo $lon $lat
+
+    # Si el mapa es global hay que hacer una doble reproyección:
+    # 1. De las coordenadas geográficas a las coordenadas cartesianas de la proyección
+    # 2. De coordenadas cartesianas de la proyección a las coordenadas cartesianas de la imagen
+    comando="cat"
+    if [ ! -z ${global} ] && [  ${global} -eq 1 ]
+    then
+        comando="${GMT} mapproject -JX${w}c/${w}c ${RAMP}"
+    fi
+
+    # A partir de las coordenadas calculadas generamos un fichero txt con las líneas que hay que pintar
+    # Primero hay que pasar las coordenadas geógraficas a cartesianas
+    paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulas.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando} )\
+     <(awk '{print $3,$4}' ${TMPDIR}/dparticulas.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando} ) \
+     <(awk -fz2color.awk <(${GMT} makecpt -Fr -C${cptViento})  ${TMPDIR}/dparticulas.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
+     awk -v w=${w} -v h=${h} -v xsize=${xsize} -v ysize=${ysize} '{printf "stroke %s line %d,%d %d,%d\n", $5, xsize*$1/w, ysize*(h-$2)/h, xsize*$3/w, ysize*(h-$4)/h}' > ${TMPDIR}/lineas.txt
+
+    # Pintamos las líneas sobre un frame transparente
+    ${CONVERT} -size ${xsize}x${ysize} xc:transparent -stroke white -strokewidth 3 -draw "@${TMPDIR}/lineas.txt" png32:${TMPDIR}/000.png
+
+
+    ### RESTO DE FRAMES
+
+    oldframe="${TMPDIR}/000.png"
+    nframe=1
+    printMessage "Generando los frames de Partículas de Viento desde ${fecha} hasta ${fechamax}"
+
+    sigmin=`date -u --date="${min:0:8} ${min:8:2} +3 hours" +%Y%m%d%H%M`
+    while [ ${fecha} -le ${fechamax} ]
+    do
+        ncFile="${TMPDIR}/${fecha}.nc"
+        ncFileU="${TMPDIR}/${fecha}_u.nc"
+        ncFileV="${TMPDIR}/${fecha}_v.nc"
+
+        # Recortamos la región deseada
+        ${GMT} grdcut ${ncFile}?u10 ${Rgeog} -G${ncFileU}
+        ${GMT} grdcut ${ncFile}?v10 ${Rgeog} -G${ncFileV}
+
+        # Si estamos pinchando rachas de viento cogemos el viento de racha del siguiente paso de tiempo (+3 horas),
+        # lo dividimos por el viento medio y multiplicamos eso por la componente U y V
+        if [ ! -z ${pintarRachasViento} ] && [ ${pintarRachasViento} -eq 1 ]
+        then
+            fechasig=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
+            ${GMT} grdmath ${Rgeog} ${TMPDIR}/${fecha}.nc\?u10 SQR ${TMPDIR}/${fecha}.nc\?v10 SQR ADD SQRT  = ${TMPDIR}/vientomedio.nc
+            ${GMT} grdmath ${Rgeog} ${TMPDIR}/${fechasig}.nc\?fg310 = ${TMPDIR}/vientoracha.nc
+            ${GMT} grdmath ${TMPDIR}/vientoracha.nc ${TMPDIR}/vientomedio.nc DIV ${ncFileU} MUL = ${ncFileU}
+            ${GMT} grdmath ${TMPDIR}/vientoracha.nc ${TMPDIR}/vientomedio.nc DIV ${ncFileV} MUL = ${ncFileV}
+        fi
+
+        # Calculamos los frames de viento que vamos a pintar para fecha
+        nframesfecha=${nframes}
+
+        # Si la fecha es la mínima o la siguiente y el mínimo es distino que minreal
+        # se pintan menos frames
+        if [ ${fecha} -le ${sigmin} ]
+        then
+            nframesfecha=${nframesinicio}
+        fi
+
+        # Si la fecha es el mínimo pintamos los frames iniciales más nframesinicio
+        if [ ${fecha} -eq ${min} ]
+        then
+            nframesfecha=$((${nframesfecha}+${nframesloop}-1))
+        fi
+
+        # Si es la ficha final (max) le añadimos el número de frames finales
+        if [ ${fecha} -eq ${max} ]
+        then
+            nframesfecha=$((${nframesfecha}+${nframesfinal}))
+        fi
+
+        printMessage "Generando ${nframesfecha} frames para fecha ${fecha}"
+
+        # Se pintan los frames calculados
+        for ((i=0; i<${nframesfecha}; i++, nframe++))
+        do
+            printMessage "Generando frame ${i} de partículas para fecha ${fecha}"
+
+            start_time="$(date -u +%s.%N)"
+
+            # Cogemos aquellas partículas que no se le haya agotado su tiempo de vida
+            awk '$3>0' ${TMPDIR}/particulas.txt > ${TMPDIR}/kkparticulas
+            n=`wc -l ${TMPDIR}/kkparticulas | awk '{print $1}'`
+
+
+            # Si se hemos descartado partículas, generamos tantas partículas nuevas como hayamos descartado
+            # asignandole un tiempo de vida máximo
+            if [ ${n} -lt ${nparticulas} ]
+            then
+                np=$((${nparticulas}-${n}))
+
+                paste <(awk -v var=${w} -v np=${np} 'BEGIN{system("shuf -n "np" -i 0-"int(var*100))}' | awk '{printf "%.2f\n",$1/100}') \
+                      <(awk -v var=${h} -v np=${np} 'BEGIN{system("shuf -n "np" -i 0-"int(var*100))}' | awk '{printf "%.2f 50\n",$1/100}') \
+                  | ${GMT} mapproject ${RGEOG} ${JGEOG} -I >> ${TMPDIR}/kkparticulas
+
+                sed '/^NaN/d' ${TMPDIR}/kkparticulas > ${TMPDIR}/kkparticulas2
+                mv ${TMPDIR}/kkparticulas2 ${TMPDIR}/kkparticulas
+
+                mv ${TMPDIR}/kkparticulas ${TMPDIR}/particulas.txt
+            fi
+
+
+            # Para cada partícula sacamos su componentes U y V y a través de ellas y de sus coordenadas calculamos el nuevo punto donde se va a situar
+            awk '{print $1,$2}' ${TMPDIR}/particulas.txt | ${GMT} grdtrack  -G${ncFileU} -G${ncFileV} | awk -v scale=${scale} -f newlatlon.awk > ${TMPDIR}/dparticulas.txt
+
+            # Actualizamos el z máximo y el z mínimo
+            read zminlocal zmaxlocal < <(awk 'BEGIN{min=9999; max=-9999}$5<min{min=$5}$5>max{max=$5}END{print min" "max}' ${TMPDIR}/dparticulas.txt)
+            if (( `echo "${zminlocal} <  ${zmin}" | bc -l` ))
+            then
+                zmin=${zminlocal}
+            fi
+            if (( `echo "${zmaxlocal} >  ${zmax}" | bc -l` ))
+            then
+                zmax=${zmaxlocal}
+            fi
+
+            # A partir de las coordenadas calculadas generamos un fichero txt con las líneas que hay que pintar
+            # Primero hay que pasar las coordenadas geógraficas a cartesianas
+            paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulas.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando})\
+            <(awk '{print $3,$4}' ${TMPDIR}/dparticulas.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando}) \
+            <(awk -fz2color.awk <(${GMT} makecpt -Fr -C${cptViento}) ${TMPDIR}/dparticulas.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
+            awk -v w=${w} -v h=${h} -v xsize=${xsize} -v ysize=${ysize} '{printf "stroke %s line %d,%d %d,%d\n", $5, xsize*$1/w, ysize*(h-$2)/h, xsize*$3/w, ysize*(h-$4)/h}' > ${TMPDIR}/lineas.txt
+
+            # Le restamos 1 al tiempo de vida de todas las partículas
+            paste ${TMPDIR}/particulas.txt ${TMPDIR}/dparticulas.txt | awk '{print $6,$7,$3-1}' > ${TMPDIR}/kkparticulas
+            mv ${TMPDIR}/kkparticulas ${TMPDIR}/particulas.txt
+
+            # Le restamos un porcentaje "fade" al canal alpha del frame anterior y sobre ese frame
+            # se dibujan las líneas nuevas, quedandose un efecto de estela sobre la partícula
+            ${CONVERT} \( ${oldframe} -matte -channel a -evaluate subtract ${fade}% \)\
+              \( -size ${xsize}x${ysize} xc:transparent -stroke white -strokewidth 3 -draw "@${TMPDIR}/lineas.txt" \)\
+               -composite png32:${TMPDIR}/`printf "%03d" ${nframe}`.png
+
+            oldframe="${TMPDIR}/`printf "%03d" ${nframe}`.png"
+
+            end_time="$(date -u +%s.%N)"
+#            echo "Tiempo frame: $(bc <<<"$end_time-$start_time")"
+
+
+
+        done
+
+        fecha=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
+    done
+
+    # Se crea la escala de viento
+    if [ ${escalaViento} -eq 1 ]
+    then
+
+        ivar=$(( `echo ${indexescala[*]} | tr " " "\n" | sort -nr | head -n 1` + 1 ))
+        index=${#indexescala[*]}
+        indexescala[${index}]=${ivar}
+        cargarVariable "uv"
+#        calcularMinMax "${variablefondo}" ${min} ${max} ${stepinterp}
+        printMessage "Generando Escala a partir de ${zmin}/${zmax} con fichero CPT ${cptViento}"
+        P=""
+
+        echo ${tipoescala[*]}
+        echo ${index} ${tipoescala[${index}]}
+        if [ ${tipoescala[${index}]} == "h" ]
+        then
+            P="-p"
+        fi
+        ./crearescala.sh ${zmin}/${zmax} ${cptViento} ${TMPDIR}/escala${ivar}.png  ${unidadEscala} "Viento" ${P} #2>> ${errorsFile}
+    fi
+fi
+
 # Generamos los frames de rótulos
 nframerotulo=1
 fecha=${minreal}

@@ -406,8 +406,16 @@ umbralPress=`awk -v w=${w} -v h=${h} 'BEGIN{printf "%.2f %.2f 0 1\n",w/2,h/2}' |
 
 
 # Cogemos el directorio de pasada con fecha más actualizada que sea menor que el mínimo
-fechapasada="`ls -d ${DIRNETCDF}/*/ | awk '{system("basename "$1)}' | sort -n | awk -v min=${min:0:10} '$1<=min' | tail -n 1`00"
+fechapasada="`find ${DIRNETCDF}/ -maxdepth 1 -mindepth 1 -type d | awk '{system("basename "$1)}' |  egrep "[0-9]{10}" | sort -n | \
+ awk -v min=${min:0:10} '$1<=min' | tail -n 1`00"
 
+# Si no se encuentra ningun directorio de pasada
+[ ${fechapasada} == "00" ] && \
+    { echo "Error: No se ha encontrado ningún directorio de pasada en ${DIRNETCDF}" >&2; usage; exit 1; }
+
+# Si el directorio de pasada pasa el patrón de 10 digitos pero no es una fecha válida
+date -d "${fechapasada:0:8} ${fechapasada:8:2}" > /dev/null 2>&1 || \
+    { echo "Error: el directorio ${fechapasada:8:10} no corresponde con una fecha válida" >&2; usage; exit 1; }
 
 
 # mínimo real especificado por el usuario

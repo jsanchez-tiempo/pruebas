@@ -1,11 +1,8 @@
 #!/bin/bash
 ###############################################################################
-# Script que genera un vídeo con una animación ......
-# que los scripts de animación tomarán como base.
-# Se generan 4 archivos en formato PNG y uno con extensión CFG: 1 imagen con el
-# mapa completo, 1 imagen sin el fondo del mar, 1 imagen con las fronteras de
-# los continentes en negro, 1 imagen con las fronteras en blanco y el fichero
-# de configuración.
+# Script que genera un vídeo con una animación en base a unas variables y un
+# mapa de fondo seleccionados.
+# Se generan 1 archivos en formato de vídeo.
 #
 #
 # Uso:
@@ -329,11 +326,13 @@ command -v ${OGR2OGR}  > /dev/null 2>&1 || { echo "error: ${OGR2OGR} no está in
 
 parseOptions "$@"
 
+checkDIRS
+
 # Si no se ha pasado archivo de conf geográfico o de estilo por parámetro se cogen estos por defecto
 [ -z ${geogfile} ] && geogfile="${GEOGCFGDIR}/spain3.cfg"
 [ -z ${stylefile} ] && stylefile="${DIRESTILOS}/meteored2.cfg"
 
-# Comprobamos que existen
+# Comprobamos que existen los ficheros de configuración
 [ ! -f "${geogfile}" ] && \
     { echo "Error: No existe el fichero de configuración geográfica ${geogfile}" >&2; usage; exit 1; }
 [ ! -f "${stylefile}" ] && \
@@ -342,7 +341,38 @@ parseOptions "$@"
 source ${geogfile}
 source ${stylefile}
 
+# Comprobamos que existen los frames del cartel del título
+if [ -d `dirname ${framescartel}` ]
+then
+    nframescartel=$(ls `dirname ${framescartel}` | egrep "`basename ${framescartel} | sed 's/%0\(.\)d/[0-9]{\1}/'`" | wc -l)
+    [ ${nframescartel} -eq 0 ] && \
+        { echo "Error: No hay frames disponibles para el cartel de rótulos en `dirname ${framescartel}`" >&2; usage; exit 1; }
+else
+    echo "Error: No se ha encontrado el directorio `dirname ${framescartel}`" >&2
+    usage
+    exit 1;
+fi
 
+# Comprobamos que existen los logos
+for((nlogo=0; nlogo<${nlogos}; nlogo++))
+do
+    [ ! -f ${logo[${nlogo}]} ] &&
+        { echo "Error: No se ha encontrado el logo ${logo[${nlogo}]}" >&2; usage; exit 1; }
+done
+
+# Chequeamos los archivos del fichero de configuración geográfica
+[ ! -z ${GLOBEFILE} ] && [ ! -f ${GLOBEFILE} ] && \
+    { echo "Error: No se ha encontrado el fichero ${GLOBEFILE}" >&2; usage; exit 1; }
+[ ! -f ${fondomar} ] && \
+    { echo "Error: No se ha encontrado el fichero ${fondomar}" >&2; usage; exit 1; }
+[ ! -f ${fronterasPNG} ] && \
+    { echo "Error: No se ha encontrado el fichero ${fronterasPNG}" >&2; usage; exit 1; }
+[ ! -f ${fondoPNG} ] && \
+    { echo "Error: No se ha encontrado el fichero ${fondoPNG}" >&2; usage; exit 1; }
+[ ! -z ${fronterasPNGw} ] && [ ! -f ${fronterasPNGw} ] && \
+    { echo "Error: No se ha encontrado el fichero ${fronterasPNGw}" >&2; usage; exit 1; }
+[ ! -z ${fronterasPNGb} ] && [ ! -f ${fronterasPNGb} ] && \
+    { echo "Error: No se ha encontrado el fichero ${fronterasPNGb}" >&2; usage; exit 1; }
 
 
 # Calculamos la longitud cartesiana y en cms. Si es global, depende de los pixeles de x e y. Si no lo es,
@@ -1213,4 +1243,3 @@ ${FFMPEG} -y -f image2 -i ${fondoPNG} ${framesViento} ${escalas} -f image2 -i ${
 printMessage "¡Se ha generado el vídeo `basename ${outputFile}` con exito!"
 
 rm -rf ${dir}
-

@@ -112,6 +112,37 @@ function RGeog {
 }
 
 
+# Chequea un directorio
+function checkdir () {
+    local dir=$@
+    if [ ! -d ${dir} ] && [ ${OVERWRITE} -eq 0 ]
+    then
+        echo "No existe el directorio ${dir}. ¿Deseas crearlo [(s)/n]?"
+        read var <&0
+        if [ ! -z ${var} ] && [ ${var,,} != "s" ];then
+            exit 0;
+        fi
+    fi
+    mkdir -p ${dir} || exit 1
+}
+
+# Chequea los directorios y los crea si no existen
+function checkDIRS () {
+
+    checkdir ${PREFIX}
+    checkdir ${DIRROTULOS}
+    checkdir ${DIRESTILOS}
+    checkdir ${DIRLOGOS}
+    checkdir ${DIRFONDOS}
+    checkdir ${DIRFRONTERAS}
+    checkdir ${GEOGCFGDIR}
+    checkdir ${CPTDIR}
+    checkdir ${GLOBEDIR}
+
+}
+
+
+
 
 # Función que dado un codigo de país, comunidad autónoma o provincia vuelca las coordenadas de sus poligonos en un fichero
 # Parámetros:
@@ -821,7 +852,7 @@ function pintarAnotaciones {
 
     local fileLabels=$1
 
-    read rotulowidth rotuloheight < <(${CONVERT} rotulos/rotuloprec/rp000.png -ping -format "%w %h" info:)
+    read rotulowidth rotuloheight < <(${CONVERT} ${DIRROTULOS}/rotuloprec/rp000.png -ping -format "%w %h" info:)
     filtro="[1]setpts=0.5*PTS/(25*TB)[rotulo0];[0]copy[out]"
     textos=""
     i=0
@@ -873,7 +904,7 @@ function pintarAnotaciones {
 
     printMessage "Insertando una animación por cada punto calculado"
 #    echo $filtro
-    ${FFMPEG} -f image2 -i  ${TMPDIR}/transparent.png -f image2  -i rotulos/rotuloprec/rp%03d.png  ${textos} -filter_complex "${filtro}" -r 25 -y -c:v png -f image2 ${TMPDIR}/anot%03d.png 2>> ${errorsFile}
+    ${FFMPEG} -f image2 -i  ${TMPDIR}/transparent.png -f image2  -i ${DIRROTULOS}/rotuloprec/rp%03d.png  ${textos} -filter_complex "${filtro}" -r 25 -y -c:v png -f image2 ${TMPDIR}/anot%03d.png 2>> ${errorsFile}
 
 }
 
@@ -1080,7 +1111,7 @@ function pintarMaximosPREC {
 
 
 
-    read rotulowidth rotuloheight < <(${CONVERT} rotulos/rotuloprec/rp000.png -ping -format "%w %h" info:)
+    read rotulowidth rotuloheight < <(${CONVERT} ${DIRROTULOS}/rotuloprec/rp000.png -ping -format "%w %h" info:)
     filtro="[1]setpts=0.5*PTS+${nframe}/(25*TB)[rotulo0];[0]copy[out]"
     textos=""
     i=0
@@ -1147,7 +1178,7 @@ function pintarMaximosPREC {
 #    filtro="${filtro};[out][rotulo${i}]overlay= x=${x}: y=${y}[out];[out]drawtext=fontsize=30:fontfile=Roboto-Bold.ttf:text=\'${t} mm\':x=${xtext}:y=${ytext}:enable=gt(n\,$((${nframe}+22)))"
 
     printMessage "Insertando una animación por cada punto calculado"
-    ${FFMPEG} -f image2 -i  ${TMPDIR}/kkb-%03d.png -f image2  -i rotulos/rotuloprec/rp%03d.png  ${textos} -filter_complex "${filtro}" -y -c:v png -f image2 ${TMPDIR}/kkc-%03d.png 2>> ${errorsFile}
+    ${FFMPEG} -f image2 -i  ${TMPDIR}/kkb-%03d.png -f image2  -i ${DIRROTULOS}/rotuloprec/rp%03d.png  ${textos} -filter_complex "${filtro}" -y -c:v png -f image2 ${TMPDIR}/kkc-%03d.png 2>> ${errorsFile}
     rename -f 's/kkc/kkb/' ${TMPDIR}/kkc-*.png
 
 }

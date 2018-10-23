@@ -30,6 +30,8 @@ function usage() {
       echo "${scriptName} tipo fechainicio fechafinal [-f archivo] [-t titulo] [-d fechapasada] [-g geogcfgfile]"
       echo "                   [-e stylecfgfile] [-v viento] [-p presion] [-m minutos] [-s slowmotion] [-o] [-h]"
       echo "                   [--nstart_frames nsframes] [--nend_frames neframes] [--nframes nframes] [--fadein fadein]"
+      echo "                   [--border color] [--transparency t] [--bottom_scale bs] [--top_scale ts]"
+      echo "                   [--show_vars] [--bottom_wind] "
       echo
       echo " tipo :           Tipo de vídeo que se va a generar. Se pueden configurar los tipos de vídeo en el directorio"
       echo "                  ${CFGDIR}. Los tipos disponibles actualmente son:"
@@ -52,8 +54,10 @@ function usage() {
       echo " -m minutos:      Minutos en los que se interpola un frame. Debe ser un divisor de 60. Un valor menor hace "
       echo "                  que la animación haga una transición más suave pero la generación del vídeo será más lenta. Por "
       echo "                  defecto viene determinado por la configuración de tipo."
-      echo " -s slowmotion:   Factor de ralentización de la animación. Debe ser un entero mayor o igual que 1. Por "
-      echo "                  defecto viene determinado por la configuración de tipo."
+      echo " -s slowmotion:   Factor de ralentización de la animación. Debe ser un entero mayor o igual que 1. El valor 1 "
+      echo "                  no altera el número de frames generados en la animación, el valor 2 duplica el número de frames "
+      echo "                  generados y el valor n multiplica por n el número de frames. Por defecto viene determinado "
+      echo "                  por la configuración de tipo."
       echo " --nstart_frames nsframes: Número de frames desde el comienzo hasta que empieza a moverse la animación. Debe ser "
       echo "                  un número entero entre 1 y 60 y no menor que el valor 'fadein'. Por defecto viene determinado en "
       echo "                  el fichero de configuración de estilo."
@@ -65,11 +69,24 @@ function usage() {
       echo " --fadein fadein: Número de frames que va a durar el efecto de transición entre el mapa base vacio "
       echo "                  y el mapa con variables. Debe ser un valor entre 0 y 60. Si se indica un valor de 0 las variables "
       echo "                  aparecen pintadas desde el principio. Por defecto es 15."
+      echo " --border color:  Color de las fronteras del mapa: 'white' para fronteras de color blanco y 'black' para fronteras "
+      echo "                  de color negro. Por defecto viene determinado por la configuración de tipo."
+      echo " --transparency t:  Porcentaje de transparencia sobre las capas de variables. Por defecto es 0."
+      echo " --bottom_scale bs: Valor mínimo de la escala de colores. Para una variable los valores por debajo de este valor no se pintarán "
+      echo "                  (transparente). 'bs' tiene el formato 'V0/V1/.../Vn-1' donde 'n' es el número de variables que se van a pintar. "
+      echo "                  Vx representa el valor de la variable en la posición x. Por defecto viene determinado por la configuración"
+      echo "                  del tipo."
+      echo " --top_scale ts:  Valor máximo de la escala de colores. Para una variable los valores por encima de este valor no se pintarán "
+      echo "                  (transparente). 'ts' tiene el formato 'V0/V1/.../Vn-1' donde 'n' es el número de variables que se van a pintar. "
+      echo "                  Vx representa el valor de la variable en la posición x. Por defecto viene determinado por la configuración"
+      echo "                  del tipo."
+      echo " --show_vars:     Muestra las variables que se van a pintar ordenadas de abajo a arriba."
+      echo " --bottom_wind:   Valor mínimo del viento. Por debajo de este valor no se pintarán las partículas del viento. Por defecto "
+      echo "                  viene determinado en la configuración del tipo."
       echo " -o:              Sobreescribe todos los ficheros sin preguntar si existen."
       echo " -h:              Muestra esta ayuda."
       echo
       echo "El fichero default.cfg define las variables de configuración de este comando."
-
 
 }
 
@@ -123,7 +140,8 @@ function parseOptions() {
 
 
     # Chequeamos el resto de opciones
-    options=$(getopt -o hf:t:d:g:e:v:p:m:s:o --long nend_frames: --long nstart_frames: --long nframes: --long fadein: --long border: -- "$@")
+    options=$(getopt -o hf:t:d:g:e:v:p:m:s:o --long nend_frames: --long nstart_frames: --long nframes: --long fadein:\
+     --long border: --long bottom_scale: --long top_scale: --long show_vars --long transparency: --long bottom_wind: -- "$@")
 
     if [ $? -ne 0 ]
     then
@@ -199,8 +217,8 @@ function parseOptions() {
         --nend_frames)
             shift
             nframesfinalParam=$1
-            ! [[ ${nframesfinalParam} =~ ${repos} ]] || [ ${nframesfinalParam} -gt 60 ] && \
-            { echo "Error: El valor --nend_frames debe entero positivo entre 0 y 60." >&2; usage; exit 1; }
+            ! [[ ${nframesfinalParam} =~ ${repos} ]] || [ ${nframesfinalParam} -gt 600 ] && \
+            { echo "Error: El valor --nend_frames debe entero positivo entre 0 y 120." >&2; usage; exit 1; }
             ;;
         --nframes)
             shift
@@ -219,6 +237,31 @@ function parseOptions() {
             borderParam=${1,,}
             [ ${borderParam} != "black" ] && [ ${borderParam} != "white" ] && \
             { echo "Error: El valor --border debe ser 'black' o 'white' ." >&2; usage; exit 1; }
+            ;;
+        --show_vars)
+            shift
+            SHOWVARS=1
+            break;
+            ;;
+        --bottom_scale)
+            shift
+            bottomscale=(`echo $1 | tr "/" " "`)
+            ;;
+        --top_scale)
+            shift
+            topscale=(`echo $1 | tr "/" " "`)
+            ;;
+        --bottom_wind)
+            shift
+            bottomwindParam=$1
+            ! [[ ${bottomwindParam} =~ ${refloat} ]] || [ ${bottomwindParam} -lt 0 ] && \
+            { echo "Error: El valor --bottomwind debe ser un valor real mayor o igual que 0." >&2; usage; exit 1; }
+            ;;
+        --transparency)
+            shift
+            transparency=$1
+            ! [[ ${transparency} =~ ${repos} ]] || [ ${transparency} -gt 100 ] && \
+            { echo "Error: El valor --transparency debe ser un valor positivo entre 0 y 100." >&2; usage; exit 1; }
             ;;
         -o)
             OVERWRITE=1
@@ -314,6 +357,8 @@ nparticulas=`awk -v w=${xlength} -v n=${dparticulas} 'BEGIN{printf "%d",w*n}'`
 fade=7.5
 # Factor de la longitud de las partículas. Se autoajusta en función de las dimensiones del
 scale=400
+# Nombre por defecto del fichero de salida
+outputFile="out.mkv"
 
 
 
@@ -352,6 +397,12 @@ else
     usage
     exit 1;
 fi
+
+# Comprobamos que existen las fuentes del titulo y subtitulo
+[ `${CONVERT} -list font | sed -n '/^[[:space:]]*Font:[[:space:]]*'${fuentetitulo}'$/Ip' | wc -l` -eq 0 ] &&\
+    { echo "Error: No se ha encontrado la fuente ${fuentetitulo}" >&2; usage; exit 1; }
+[ `${CONVERT} -list font | sed -n '/^[[:space:]]*Font:[[:space:]]*'${fuentesubtitulo}'$/Ip' | wc -l` -eq 0 ] &&\
+    { echo "Error: No se ha encontrado la fuente ${fuentesubtitulo}" >&2; usage; exit 1; }
 
 # Comprobamos que existen los logos
 for((nlogo=0; nlogo<${nlogos}; nlogo++))
@@ -402,7 +453,7 @@ awk -v scale=${scale} -f newlatlon.awk | awk '{print $1,$2; print $3,$4}' | ${GM
 # En cms
 umbralPress=`awk -v w=${w} -v h=${h} 'BEGIN{printf "%.2f %.2f 0 1\n",w/2,h/2}' | ${GMT} mapproject  ${J} ${R} -I |\
   awk -v scale=100 -f newlatlon.awk | awk '{print $1,$2; print $3,$4}' | ${GMT} mapproject ${J} ${R} |\
-   awk 'NR==1{x1=$1; y1=$2}NR==2{print 858*($2-y1)}'`
+   awk -v mins=${mins} 'NR==1{x1=$1; y1=$2}NR==2{print mins/30*858*($2-y1)}'`
 
 
 # Cogemos el directorio de pasada con fecha más actualizada que sea menor que el mínimo
@@ -435,6 +486,10 @@ desfasemin=$((${minreal:0:10}-${min:0:10}))
 # Cargamos las variables según el tipo seleccionado
 source cfg/${tipo}.cfg
 
+# Si se ha seleccionado la opción --showvars, mostramos las variables y salimos
+[ ! -z ${SHOWVARS} ] && [ ${SHOWVARS} -eq 1 ] &&
+    { echo "${variablesanimacion[*]}"; exit 0; }
+
 # Modificamos las variables según los parámetros pasados
 [ ! -z "${tituloParam}" ] && titulo="${tituloParam}"
 [ ! -z ${pintarVientoParam} ] && pintarViento=${pintarVientoParam}
@@ -446,6 +501,10 @@ source cfg/${tipo}.cfg
 [ ! -z ${nframesParam} ] && nframes=${nframesParam}
 [ ! -z ${fadeinParam} ] && fadein=${fadeinParam}
 [ ! -z ${fechapasadaParam} ] && fechapasada=${fechapasadaParam}
+[ ! -z ${bottomwindParam} ] && bottomwind=${bottomwindParam}
+
+# Si se ha especificado un valor de transparencia lo normalizamos a un valor de 0 a 1
+[ ! -z ${transparency} ] && transparency=`awk -v t=${transparency} 'BEGIN{printf "%.4f",1-t/100}'`
 
 # Si en la configuración del tipo se ha indicado el color blanco
 if [ ! -z ${colorfronteras} ] && [ ${colorfronteras} == "white" ]
@@ -503,6 +562,53 @@ fi
 nframefinal=$((${nsteps}*${nframes}+${nframesloop}+${nframesinicio}*${nstepsinicio}))
 
 
+refloat="^[+-]?[0-9]+([.][0-9]+)?$"
+if [ ${#bottomscale[*]} -gt 0 ] && [ ${#bottomscale[*]} -le ${#variablesanimacion[*]} ]
+then
+    for ((i=0;i<${#variablesanimacion[*]};i++))
+    do
+        if [ ${i} -lt ${#bottomscale[*]} ]
+        then
+            ! [[ ${bottomscale[${i}]}  =~ ${refloat} ]] && [ ${bottomscale[${i}]^^}  != "N" ] &&
+            { echo "Error: El parámetro ${bottomscale[${i}]} no tiene un formato correcto" >&2; usage; exit 1; }
+        else
+            bottomscale[${i}]="N"
+        fi
+    done
+elif [ ${#bottomscale[*]} -gt 0 ]
+then
+    echo "Error: El número de parámetros pasados a la opción --bottom_scale no puede ser superior que el número de variables" >&2;
+    usage;
+    exit 1;
+fi
+
+
+if [ ${#topscale[*]} -gt 0 ] && [ ${#topscale[*]} -le ${#variablesanimacion[*]} ]
+then
+    for ((i=0;i<${#variablesanimacion[*]};i++))
+    do
+        if [ ${i} -lt ${#topscale[*]} ]
+        then
+            ! [[ ${topscale[${i}]}  =~ ${refloat} ]] && [ ${topscale[${i}]^^}  != "N" ] &&
+            { echo "Error: El parámetro ${topscale[${i}]} no tiene un formato correcto" >&2; usage; exit 1; }
+        else
+            topscale[${i}]="N"
+        fi
+    done
+elif [ ${#topscale[*]} -gt 0 ]
+then
+    echo "Error: El número de parámetros pasados a la opción --top_scale no puede ser superior que el número de variables" >&2;
+    usage;
+    exit 1;
+fi
+
+
+
+
+#echo ${variablesanimacion[*]}
+#echo ${bottomscale[*]}
+#
+#exit
 
 
 TMPDIR="/tmp"
@@ -526,9 +632,6 @@ trap "echo 'error: ha fallado la ejecución. Saliendo' >&2;exit 1" ERR
 # Fichero de errores
 errorsFile="${TMPDIR}/errors.txt"
 touch ${errorsFile}
-
-
-
 
 
 
@@ -571,6 +674,30 @@ then
 
         # Cargamos la configuración de la variable
         cargarVariable ${variablefondo}
+
+        tcolor="none"
+        [ ${ivar} -lt ${#bottomscale[*]} ] && [ ${bottomscale[${ivar}]} != "N" ] && \
+            {
+                ${GMT} makecpt -C${cptGMT} -Fr | awk -v umbral=${bottomscale[${ivar}]} '$1~/F|N|B/||$1>=umbral{print $0}' > ${TMPDIR}/bottom.cpt;
+                cptGMT="${TMPDIR}/bottom.cpt";
+                tcolor=`sed -n '/^B/p' ${cptGMT} | tr "/" "," | awk '{printf "rgb(%s)",$2}'`
+            };
+
+        [ ${ivar} -lt ${#topscale[*]} ] && [ ${topscale[${ivar}]} != "N" ] && \
+            {
+
+                ${GMT} makecpt -C${cptGMT} -Fr | awk -v umbral=${topscale[${ivar}]} '$1~/F|N|B/||$1<=umbral{print $0}' > ${TMPDIR}/top.cpt;
+                cptGMT="${TMPDIR}/top.cpt";
+                if [ ${tcolor} == "none" ]
+                then
+                    tcolor=`sed -n '/^F/p' ${cptGMT} | tr "/" "," | awk '{printf "rgb(%s)",$2}'`
+                else
+                    Bcolor=`sed -n '/^B/p' ${cptGMT} | awk '{print $2}' | sed 's/\//\\\\\//g'`
+                    sed "s/^F.*$/F ${Bcolor}/" ${cptGMT} > ${TMPDIR}/kk.cpt
+                    mv  ${TMPDIR}/kk.cpt  ${cptGMT}
+                fi
+
+            };
 
         fecha=${min}
         fechamax=${max}
@@ -623,7 +750,7 @@ then
         fi
 
         # Generamos los frames a partir de los grids interpolados
-        generarFrames "${variablefondo}" ${min} ${max} ${mins} ${stepinterp}
+        generarFrames "${variablefondo}" ${min} ${max} ${mins} ${tcolor} ${transparency}
 
         # En imagenes en blanco y negro convertimos uno de sus canales a canal alpha (nubes)
         if [ ! -z ${estransparente} ] && [ ${estransparente} -eq 1 ]
@@ -650,8 +777,18 @@ then
     do
         variablefondo=${variablesanimacion[${ivar}]}
         cargarVariable ${variablefondo}
+
         #Calcular maximo y mínimo de todos los grids de la variable
-        calcularMinMax "${variablefondo}" ${min} ${max} ${stepinterp}
+        [ ${ivar} -ge ${#bottomscale[*]} ] || [ ${bottomscale[${ivar}]} == "N" ] || \
+        [ ${ivar} -ge ${#topscale[*]} ] || [ ${topscale[${ivar}]} == "N" ] && \
+            calcularMinMax "${variablefondo}" ${min} ${max} ${stepinterp}
+
+        [ ${ivar} -lt ${#bottomscale[*]} ] && [ ${bottomscale[${ivar}]} != "N" ] && \
+            zmin=${bottomscale[${ivar}]}
+
+        [ ${ivar} -lt ${#topscale[*]} ] && [ ${topscale[${ivar}]} != "N" ] && \
+            zmax=${topscale[${ivar}]}
+
         printMessage "Generando Escala para ${variablefondo} a partir de ${zmin}/${zmax} con fichero CPT ${cptGMT}"
         P=""
         # Si la escala es horizontal
@@ -703,13 +840,13 @@ then
     # Interpolamos los grids
     interpolarFrames "msl" ${min} ${max} ${mins} 3
 
-    generarFrames "msl" ${min} ${max} ${mins} 3
+    generarFrames "msl" ${min} ${max} ${mins} "none" 1
 
     replicarFrames "msl"
 
     # Número mínimo de frames seguidos que debe aparecer una letra de Baja o Alta presión
     # Está configurado como la mitad de los frames de la animación
-    nminframesMSL=$(( (`date -u -d "${max:0:8} ${max:8:4}" +%s`-`date -u -d "${min:0:8} ${min:8:4}" +%s`)/(${mins}*60*2) ))
+    nminframesMSL=$(( (`date -u -d "${max:0:8} ${max:8:4}" +%s`-`date -u -d "${min:0:8} ${min:8:4}" +%s`)/(${mins}*60*4) ))
 
 
     printMessage "Calculando máximos/mínimos de MSL desde ${min} hasta ${max}"
@@ -810,13 +947,30 @@ then
     fechamax=${max}
 
 
+    # Si no se ha especificado ninguno el nivel es 0
+    [ -z ${windlevel} ] && windlevel=0
+
+
     ncFile="${TMPDIR}/${fecha}.nc"
     ncFileU="${TMPDIR}/${fecha}_u.nc"
     ncFileV="${TMPDIR}/${fecha}_v.nc"
+    varU="u10"
+    varV="v10"
+
+    # Si el nivel es mayor que 0 las variables son u y v en vez de u10 y v10
+    if [ ${windlevel} -gt 0 ]
+    then
+        varU="u"
+        varV="v"
+    fi
+
+    # Separamos el nivel que queremos
+    ${CDO} -sellevel,${windlevel} -selvar,${varU} ${TMPDIR}/${fecha}.nc ${ncFileU} 2>> ${errorsFile}
+    ${CDO} -sellevel,${windlevel} -selvar,${varV} ${TMPDIR}/${fecha}.nc ${ncFileV} 2>> ${errorsFile}
 
     # Recortamos la región deseada
-    ${GMT} grdcut ${ncFile}?u10 ${Rgeog} -G${ncFileU}
-    ${GMT} grdcut ${ncFile}?v10 ${Rgeog} -G${ncFileV}
+    ${GMT} grdcut ${ncFileU}?${varU} ${Rgeog} -G${ncFileU}
+    ${GMT} grdcut ${ncFileV}?${varV} ${Rgeog} -G${ncFileV}
 
     # Si estamos pinchando rachas de viento cogemos el viento de racha del siguiente paso de tiempo (+3 horas),
     # lo dividimos por el viento medio y multiplicamos eso por la componente U y V
@@ -829,13 +983,18 @@ then
         ${GMT} grdmath ${TMPDIR}/vientoracha.nc ${TMPDIR}/vientomedio.nc DIV ${ncFileV} MUL = ${ncFileV}
     fi
 
+    [ -z ${bottomwind} ] && bottomwind=0
 
     # Para cada partícula sacamos su componentes U y V y a través de ellas y de sus coordenadas calculamos el nuevo punto donde se va a situar
-    awk '{print $1,$2}' ${TMPDIR}/particulas.txt | ${GMT} grdtrack -G${ncFileU} -G${ncFileV} | awk -v scale=${scale}  -f newlatlon.awk > ${TMPDIR}/dparticulas.txt
+    awk '{print $1,$2}' ${TMPDIR}/particulas.txt | ${GMT} grdtrack -G${ncFileU} -G${ncFileV} | \
+    awk -v scale=${scale}  -f newlatlon.awk | awk -v umbral=${bottomwind} '$5>=umbral' > ${TMPDIR}/dparticulas.txt
+
+    # Filtramos las partículas para que solo se pinten las que sean superior a determinado umbral
+    awk -v umbral=${bottomwind} '$5>=umbral' ${TMPDIR}/dparticulas.txt > ${TMPDIR}/dparticulasfilter.txt
 
 
     # Actualizamos el z máximo y el z mínimo
-    read zminlocal zmaxlocal < <(awk 'BEGIN{min=9999; max=-9999}$5<min{min=$5}$5>max{max=$5}END{print min" "max}' ${TMPDIR}/dparticulas.txt)
+    read zminlocal zmaxlocal < <(awk 'BEGIN{min=9999; max=-9999}$5<min{min=$5}$5>max{max=$5}END{print min" "max}' ${TMPDIR}/dparticulasfilter.txt)
     if (( `echo "${zminlocal} <  ${zmin}" | bc -l` ))
     then
         zmin=${zminlocal}
@@ -856,9 +1015,9 @@ then
 
     # A partir de las coordenadas calculadas generamos un fichero txt con las líneas que hay que pintar
     # Primero hay que pasar las coordenadas geógraficas a cartesianas
-    paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulas.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando} )\
-     <(awk '{print $3,$4}' ${TMPDIR}/dparticulas.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando} ) \
-     <(awk -fz2color.awk <(${GMT} makecpt -Fr -C${cptViento})  ${TMPDIR}/dparticulas.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
+    paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulasfilter.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando} )\
+     <(awk '{print $3,$4}' ${TMPDIR}/dparticulasfilter.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando} ) \
+     <(awk -fz2color.awk <(${GMT} makecpt -Fr -C${cptViento})  ${TMPDIR}/dparticulasfilter.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
      awk -v w=${w} -v h=${h} -v xsize=${xsize} -v ysize=${ysize} '{printf "stroke %s line %d,%d %d,%d\n", $5, xsize*$1/w, ysize*(h-$2)/h, xsize*$3/w, ysize*(h-$4)/h}' > ${TMPDIR}/lineas.txt
 
     # Pintamos las líneas sobre un frame transparente
@@ -878,9 +1037,12 @@ then
         ncFileU="${TMPDIR}/${fecha}_u.nc"
         ncFileV="${TMPDIR}/${fecha}_v.nc"
 
+        ${CDO} -sellevel,${windlevel} -selvar,${varU} ${TMPDIR}/${fecha}.nc ${ncFileU} 2>> ${errorsFile}
+        ${CDO} -sellevel,${windlevel} -selvar,${varV} ${TMPDIR}/${fecha}.nc ${ncFileV} 2>> ${errorsFile}
+
         # Recortamos la región deseada
-        ${GMT} grdcut ${ncFile}?u10 ${Rgeog} -G${ncFileU}
-        ${GMT} grdcut ${ncFile}?v10 ${Rgeog} -G${ncFileV}
+        ${GMT} grdcut ${ncFileU}?${varU} ${Rgeog} -G${ncFileU}
+        ${GMT} grdcut ${ncFileV}?${varV} ${Rgeog} -G${ncFileV}
 
         # Si estamos pinchando rachas de viento cogemos el viento de racha del siguiente paso de tiempo (+3 horas),
         # lo dividimos por el viento medio y multiplicamos eso por la componente U y V
@@ -947,10 +1109,14 @@ then
 
 
             # Para cada partícula sacamos su componentes U y V y a través de ellas y de sus coordenadas calculamos el nuevo punto donde se va a situar
-            awk '{print $1,$2}' ${TMPDIR}/particulas.txt | ${GMT} grdtrack  -G${ncFileU} -G${ncFileV} | awk -v scale=${scale} -f newlatlon.awk > ${TMPDIR}/dparticulas.txt
+            awk '{print $1,$2}' ${TMPDIR}/particulas.txt | ${GMT} grdtrack  -G${ncFileU} -G${ncFileV} | \
+             awk -v scale=${scale} -f newlatlon.awk  > ${TMPDIR}/dparticulas.txt
+
+            # Filtramos las partículas para que solo se pinten las que sean superior a determinado umbral
+            awk -v umbral=${bottomwind} '$5>=umbral' ${TMPDIR}/dparticulas.txt > ${TMPDIR}/dparticulasfilter.txt
 
             # Actualizamos el z máximo y el z mínimo
-            read zminlocal zmaxlocal < <(awk 'BEGIN{min=9999; max=-9999}$5<min{min=$5}$5>max{max=$5}END{print min" "max}' ${TMPDIR}/dparticulas.txt)
+            read zminlocal zmaxlocal < <(awk 'BEGIN{min=9999; max=-9999}$5<min{min=$5}$5>max{max=$5}END{print min" "max}' ${TMPDIR}/dparticulasfilter.txt)
             if (( `echo "${zminlocal} <  ${zmin}" | bc -l` ))
             then
                 zmin=${zminlocal}
@@ -962,9 +1128,9 @@ then
 
             # A partir de las coordenadas calculadas generamos un fichero txt con las líneas que hay que pintar
             # Primero hay que pasar las coordenadas geógraficas a cartesianas
-            paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulas.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando})\
-            <(awk '{print $3,$4}' ${TMPDIR}/dparticulas.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando}) \
-            <(awk -fz2color.awk <(${GMT} makecpt -Fr -C${cptViento}) ${TMPDIR}/dparticulas.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
+            paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulasfilter.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando})\
+            <(awk '{print $3,$4}' ${TMPDIR}/dparticulasfilter.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando}) \
+            <(awk -fz2color.awk <(${GMT} makecpt -Fr -C${cptViento}) ${TMPDIR}/dparticulasfilter.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
             awk -v w=${w} -v h=${h} -v xsize=${xsize} -v ysize=${ysize} '{printf "stroke %s line %d,%d %d,%d\n", $5, xsize*$1/w, ysize*(h-$2)/h, xsize*$3/w, ysize*(h-$4)/h}' > ${TMPDIR}/lineas.txt
 
             # Le restamos 1 al tiempo de vida de todas las partículas

@@ -284,8 +284,10 @@ function calcularMinMax {
 
 function generarFrame {
 
-    local tcolor
+    local tcolor=$1
+    local transparency=$2
     local color2transparent
+    local applytransparency
 
     ${GMT} psbasemap ${R} ${J}  -B+n --PS_MEDIA="${xlength}cx${ylength}c" -Xc -Yc --MAP_FRAME_PEN="0p,black" -P -K > ${tmpFile}
 
@@ -302,9 +304,12 @@ function generarFrame {
     inputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`.png
     outputpng=`dirname ${tmpFile}`/`basename ${tmpFile} .ps`-fhd.png
 
-    [ ! -z ${tcolor} ] && color2transparent="-transparent ${tcolor}"
+    [ ! -z ${tcolor} ] && [ ${tcolor} != "none" ] && color2transparent="-transparent ${tcolor}"
+    [ ! -z ${transparency} ] && (( `echo "${transparency} <  1" | bc -l` )) && \
+     applytransparency="-channel A -evaluate multiply ${transparency} +channel"
 
-    ${CONVERT} ${color2transparent} -resize ${xsize}x${ysize}!  ${inputpng} png32:${outputpng}
+
+    ${CONVERT} ${color2transparent} -resize ${xsize}x${ysize}!  ${inputpng} ${applytransparency}  png32:${outputpng}
 
     cp ${outputpng} ${TMPDIR}/${var}`printf "%03d\n" ${nframe}`.png
 }
@@ -318,7 +323,8 @@ function generarFrames {
     local min=$2
     local max=$3
     local mins=$4
-#    local step=$5
+    local tcolor=$5
+    local transparency=$6
 
     local fecha=${min}
     local nframe=0
@@ -334,7 +340,7 @@ function generarFrames {
 
         if [ ${fecha} -ge ${minreal} ]
         then
-            generarFrame
+            generarFrame ${tcolor} ${transparency}
             nframe=$((${nframe}+1))
         fi
         fecha=`date -u --date="${fecha:0:8} ${fecha:8:4} +${mins} minutes" +%Y%m%d%H%M`

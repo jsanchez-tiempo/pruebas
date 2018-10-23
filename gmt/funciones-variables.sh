@@ -32,10 +32,14 @@ function cargarVariable {
 
 function procesarGH500 {
 
-    cdo -sellevel,500 -selvar,gh ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${dataFileDST}
+    ${CDO} -sellevel,500 -selvar,gh ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${dataFileDST}
+
+
 
     ${GMT} grdconvert -Rd ${dataFileDST}\?gh ${dataFileDST} 2>> ${errorsFile}
     ${GMT} grdmath ${Rgeog} ${dataFileDST} 9.81 DIV 10 DIV = ${dataFileDST} 2>> ${errorsFile}
+
+    ${GMT} grdsample -I0.5 ${dataFileDST}  -G${dataFileDST}
 
 }
 
@@ -44,17 +48,19 @@ function pintarGH500 {
 
     dataFile=$1
 
-    [ ! -z ${dpi} ] && E="-E${dpi}"
-    ${GMT} grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile}
+    ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb7 -Nr
 
-#    gmt grdcontour ${dataFile} -S500 -J -R  -W1p,gray25 -A+552+f8p -K -O >> ${tmpFile}
-    ${GMT} grdcontour ${dataFile}  -S500 ${J} ${R} -W1p,gray25 -C+552 -K -O >> ${tmpFile}
+    [ ! -z ${dpi} ] && E="-E${dpi}"
+    ${GMT} grdimage ${TMPDIR}/kk  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile}
+
+##    gmt grdcontour ${dataFile} -S500 -J -R  -W1p,gray25 -A+552+f8p -K -O >> ${tmpFile}
+#    ${GMT} grdcontour ${TMPDIR}/kk  -S500 ${J} ${R} -W1p,gray25 -C+552 -K -O >> ${tmpFile}
 
 
 }
 
 function procesarT500 {
-    cdo -sellevel,500 -selvar,t ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${errorsFile}
+    ${CDO} -sellevel,500 -selvar,t ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${errorsFile}
 
     ${GMT} grdconvert -Rd ${dataFileDST}\?t ${dataFileDST} 2>> ${errorsFile}
     ${GMT} grdmath ${Rgeog} ${dataFileDST} 273.15 SUB = ${dataFileDST} 2>> ${errorsFile}
@@ -62,7 +68,7 @@ function procesarT500 {
 }
 
 function procesarT850 {
-    cdo -sellevel,850 -selvar,t ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${errorsFile}
+    ${CDO} -sellevel,850 -selvar,t ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${errorsFile}
 
     ${GMT} grdconvert -Rd ${dataFileDST}\?t ${dataFileDST} 2>> ${errorsFile}
     ${GMT} grdmath ${Rgeog} ${dataFileDST} 273.15 SUB = ${dataFileDST} 2>> ${errorsFile}
@@ -95,6 +101,19 @@ function procesarViento {
 
 }
 
+function procesarViento300 {
+
+        dataFileU=${TMPDIR}/${fecha}_u300.nc
+        dataFileV=${TMPDIR}/${fecha}_v300.nc
+        ${CDO} -sellevel,300 -selvar,u ${TMPDIR}/${fecha}.nc ${dataFileU} 2>> ${errorsFile}
+        ${CDO} -sellevel,300 -selvar,v ${TMPDIR}/${fecha}.nc ${dataFileV} 2>> ${errorsFile}
+
+        ${GMT} grdmath   ${dataFileU}\?u SQR  ${dataFileV}\?v SQR ADD SQRT 3.6 MUL = ${dataFileDST}
+        ${GMT} grdconvert -Rd ${dataFileDST} ${dataFileDST}
+        ${GMT} grdsample ${Rgeog}  ${dataFileDST} -I${resolucion}  -G${dataFileDST}
+
+}
+
 function procesarRachasViento {
         fechasig=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
         ${GMT} grdmath  ${TMPDIR}/${fechasig}.nc\?fg310 3.6 MUL = ${dataFileDST}
@@ -106,6 +125,13 @@ function procesarRachasViento {
 
 
 function pintarViento {
+
+    dataFile=$1
+    ${GMT} grdimage ${dataFile} ${J} ${R} ${X} ${Y} -Q -C${cptGMT} -nc+c -E${dpi} -K -O >> ${tmpFile}
+
+}
+
+function pintarViento300 {
 
     dataFile=$1
     ${GMT} grdimage ${dataFile} ${J} ${R} ${X} ${Y} -Q -C${cptGMT} -nc+c -E${dpi} -K -O >> ${tmpFile}

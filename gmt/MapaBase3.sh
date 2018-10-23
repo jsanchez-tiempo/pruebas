@@ -214,34 +214,34 @@ function parseOptions() {
 }
 
 
-# Chequea un directorio
-function checkdir () {
-    local dir=$@
-    if [ ! -d ${dir} ] && [ ${OVERWRITE} -eq 0 ]
-    then
-        echo "No existe el directorio ${dir}. ¿Deseas crearlo [(s)/n]?"
-        read var <&0
-        if [ ! -z ${var} ] && [ ${var,,} != "s" ];then
-            exit 0;
-        fi
-    fi
-    mkdir -p ${dir} || exit 1
-}
-
-# Chequea los directorios y los crea si no existe
-function checkDIRS () {
-
-    checkdir ${PREFIX}
-    checkdir ${DIRROTULOS}
-    checkdir ${DIRESTILOS}
-    checkdir ${DIRLOGOS}
-    checkdir ${DIRFONDOS}
-    checkdir ${DIRFRONTERAS}
-    checkdir ${GEOGCFGDIR}
-    checkdir ${CPTDIR}
-    checkdir ${GLOBEDIR}
-
-}
+## Chequea un directorio
+#function checkdir () {
+#    local dir=$@
+#    if [ ! -d ${dir} ] && [ ${OVERWRITE} -eq 0 ]
+#    then
+#        echo "No existe el directorio ${dir}. ¿Deseas crearlo [(s)/n]?"
+#        read var <&0
+#        if [ ! -z ${var} ] && [ ${var,,} != "s" ];then
+#            exit 0;
+#        fi
+#    fi
+#    mkdir -p ${dir} || exit 1
+#}
+#
+## Chequea los directorios y los crea si no existen
+#function checkDIRS () {
+#
+#    checkdir ${PREFIX}
+#    checkdir ${DIRROTULOS}
+#    checkdir ${DIRESTILOS}
+#    checkdir ${DIRLOGOS}
+#    checkdir ${DIRFONDOS}
+#    checkdir ${DIRFRONTERAS}
+#    checkdir ${GEOGCFGDIR}
+#    checkdir ${CPTDIR}
+#    checkdir ${GLOBEDIR}
+#
+#}
 
 # Escribe el fichero de configuración geográfico
 function writeGeogCFG () {
@@ -251,7 +251,7 @@ function writeGeogCFG () {
     echo
     echo "### Resolución"
     echo "resolucion=${resformat}"
-    echo "GLOBEFILE=${GLOBEFILE}"
+    echo "GLOBEFILE=${GLOBEFILECFG}"
     echo
     echo "### Dimensiones"
     echo "xsize=${xsize}"
@@ -266,7 +266,7 @@ function writeGeogCFG () {
         # Le aplicamos el efecto de sombra de la tierra para quede más tridimensional
         if [ ! -z ${sombratierra} ] && [  ${sombratierra} -eq 1 ]
         then
-            echo "filesombra=${outputFinalSombraPNG}"
+            echo "filesombra=${outputCFGSombraPNG}"
         fi
 
 
@@ -278,16 +278,16 @@ function writeGeogCFG () {
     then
         echo "fondomar=${fondomarvideo}"
     else
-        echo "fondomar=${fondomarsrc}"
+        echo "fondomar=${fondomarCFGsrc}"
     fi
 
     echo
     echo "### Fondos"
-    echo "fondoPNG=${outputFinalPNG}"
-    echo "fondoPNG=${outputFinalsmPNG}"
-    echo "fronterasPNGw=${outputFinalbwPNG}"
-    echo "fronterasPNGb=${outputFinalbbPNG}"
-    echo "fronterasPNG=${outputFinalbbPNG}"
+    echo "fondoPNG=${outputCFGPNG}"
+    echo "fondoPNG=${outputCFGsmPNG}"
+    echo "fronterasPNGw=${outputCFGbwPNG}"
+    echo "fronterasPNGb=${outputCFGbbPNG}"
+    echo "fronterasPNG=${outputCFGbbPNG}"
     echo
 
     if [ ! -z ${cod} ]
@@ -448,9 +448,11 @@ fi
 # Comprobamos que existe el fondo del mar
 if [ ! -f ${fondomar} ]
 then
-    echo "error: No se ha encontrado el archivo de fondo de mar  ${fondomar}." >&2
+    echo "error: No se ha encontrado el archivo de fondo de mar ${fondomar}." >&2
     exit 1
 fi
+
+
 
 # Copia el archivo de fondo del mar a la carpeta de fondos
 if [ $(dirname $(realpath ${fondomar} )) !=  $(realpath ${DIRFONDOS}) ]
@@ -466,7 +468,7 @@ then
     cp -f ${fondomar} ${DIRFONDOS}
     fondomar=${DIRFONDOS}/`basename ${fondomar}`
 fi
-
+fondomarCFGsrc='${DIRFONDOS}/'`basename ${fondomar}`
 fondomarsrc=${fondomar}
 
 
@@ -487,6 +489,13 @@ outputFinalsmPNG=${DIRFONDOS}/${outputFile}sm.png # sin mar
 outputFinalbwPNG=${DIRFONDOS}/${outputFile}bw.png # fronteras blancas
 outputFinalbbPNG=${DIRFONDOS}/${outputFile}bb.png # fronteras negras
 outputFinalSombraPNG="${DIRFONDOS}/${outputFile}sombra.png" # Fichero de sombra (solo global)
+
+# Variables a escribir en el fichero CFG
+outputCFGPNG='${DIRFONDOS}/'${outputFile}.png # mapa completo
+outputCFGsmPNG='${DIRFONDOS}/'${outputFile}sm.png # sin mar
+outputCFGbwPNG='${DIRFONDOS}/'${outputFile}bw.png # fronteras blancas
+outputCFGbbPNG='${DIRFONDOS}/'${outputFile}bb.png # fronteras negras
+outputCFGSombraPNG='${DIRFONDOS}/'${outputFile}sombra.png # Fichero de sombra (solo global)
 
 # Si existe alguno preguntamos si se quiere sobreescribir
 if ([ -f ${outputFinalPNG} ] || [ -f ${outputFinalsmPNG} ] || [ -f ${outputFinalbwPNG} ] || [ -f ${outputFinalbbPNG} ])&&[ ${OVERWRITE} -eq 0 ]
@@ -647,6 +656,9 @@ then
 
     fi
 fi
+
+
+GLOBEFILECFG='${GLOBEDIR}/'`basename ${GLOBEFILE}`
 
 # Definimos la R
 R="-R${lonmin}/${latmin}/${lonmax}/${latmax}+r"

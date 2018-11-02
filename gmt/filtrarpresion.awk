@@ -19,13 +19,18 @@ $1==finicial{
 	cont++;
 }
 $1>finicial{
+   "date -u -d \""substr($1,0,8)" "substr($1,9,4)"\" +%Y%m%d%H%M" | getline fecha; 
+   "date -u -d \""substr($1,0,8)" "substr($1,9,4)" -"mins" mins\" +%Y%m%d%H%M" | getline fechaanterior;
+
     UMBRAL=umbral
     for(i=0; i<cont; i++){
-        #print cont" "i": "$4,array[i]["x"],$5,array[i]["y"], modulo($4-array[i]["x"],$5-array[i]["y"]);
-        if(modulo($4-array[i]["x"],$5-array[i]["y"]) < UMBRAL){
+	
+        if(modulo($4-array[i]["x"],$5-array[i]["y"]) < UMBRAL && fechaanterior==array[i]["fecha"] ){
+		#print array[i]["fecha"], fechaanterior;
             print $0,array[i]["cod"];
             array[i]["x"]=$4;
             array[i]["y"]=$5;
+	    array[i]["fecha"]=fecha;
             break;
         }
     }

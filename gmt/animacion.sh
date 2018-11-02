@@ -6,9 +6,12 @@
 #
 #
 # Uso:
-# animacion.sh tipo min max [-f archivo] [-t titulo] [-d fechapasada] [-g geogcfgfile] [-e stylecfgfile]
-#              [-v viento] [-p presion] [-m minutos] [-s slowmotion] [-o] [-h]
-#              [--nstart_frames nsframes] [--nend_frames neframes] [--nframes nframes] [--fadein fadein]
+# animacion.sh tipo fechainicio fechafinal [-f archivo] [-t titulo] [-d fechapasada] [-g geogcfgfile]
+#                   [-e stylecfgfile] [-v viento] [-p presion] [-m minutos] [-s slowmotion] [-o] [-h]
+#                   [--nstart_frames nsframes] [--nend_frames neframes] [--nframes nframes] [--fadein fadein]
+#                   [--border color] [--transparency t] [--bottom_scale bs] [--top_scale ts]
+#                   [--show_vars] [--bottom_wind valor] [--presscfg filepress] [--labels filelabels]
+#                   [--geoglabels]"
 #
 # Juan Sánchez Segura <jsanchez.tiempo@gmail.com>
 # Marcos Molina Cano <marcosmolina.tiempo@gmail.com>
@@ -31,7 +34,8 @@ function usage() {
       echo "                   [-e stylecfgfile] [-v viento] [-p presion] [-m minutos] [-s slowmotion] [-o] [-h]"
       echo "                   [--nstart_frames nsframes] [--nend_frames neframes] [--nframes nframes] [--fadein fadein]"
       echo "                   [--border color] [--transparency t] [--bottom_scale bs] [--top_scale ts]"
-      echo "                   [--show_vars] [--bottom_wind] "
+      echo "                   [--show_vars] [--bottom_wind valor] [--presscfg filepress] [--labels filelabels] "
+      echo "                   [--geoglabels]"
       echo
       echo " tipo :           Tipo de vídeo que se va a generar. Se pueden configurar los tipos de vídeo en el directorio"
       echo "                  ${CFGDIR}. Los tipos disponibles actualmente son:"
@@ -81,8 +85,14 @@ function usage() {
       echo "                  Vx representa el valor de la variable en la posición x. Por defecto viene determinado por la configuración"
       echo "                  del tipo."
       echo " --show_vars:     Muestra las variables que se van a pintar ordenadas de abajo a arriba."
-      echo " --bottom_wind:   Valor mínimo del viento. Por debajo de este valor no se pintarán las partículas del viento. Por defecto "
+      echo " --bottom_wind valor: Valor mínimo del viento. Por debajo de este valor no se pintarán las partículas del viento. Por defecto "
       echo "                  viene determinado en la configuración del tipo."
+      echo " --presscfg filepress: Fichero de configuración de presión. Utilizará la configuración de presión especificada en el fichero. Se"
+      echo "                  puede generar con el script presslabels.sh."
+      echo " --labels filelabels: Fichero de trayectoria de etiquetas. Pintará las etiquetas definidas en este fichero. Se puede generar"
+      echo "                  generar con el script labels.sh."
+      echo " --geoglabels:    Indica si las coordenadas definidas en el fichero de etiquetas son geográficas. Si no se usa esta opción"
+      echo "                  se tomarán como cartesianas."
       echo " -o:              Sobreescribe todos los ficheros sin preguntar si existen."
       echo " -h:              Muestra esta ayuda."
       echo
@@ -141,7 +151,8 @@ function parseOptions() {
 
     # Chequeamos el resto de opciones
     options=$(getopt -o hf:t:d:g:e:v:p:m:s:o --long nend_frames: --long nstart_frames: --long nframes: --long fadein:\
-     --long border: --long bottom_scale: --long top_scale: --long show_vars --long transparency: --long bottom_wind: -- "$@")
+     --long border: --long bottom_scale: --long top_scale: --long show_vars --long transparency: --long bottom_wind: \
+     --long presscfg: --long pressexclude: --long labels: --long geoglabels -- "$@")
 
     if [ $? -ne 0 ]
     then
@@ -263,6 +274,22 @@ function parseOptions() {
             ! [[ ${transparency} =~ ${repos} ]] || [ ${transparency} -gt 100 ] && \
             { echo "Error: El valor --transparency debe ser un valor positivo entre 0 y 100." >&2; usage; exit 1; }
             ;;
+        --presscfg)
+            shift
+            presscfgfile=$1
+            ;;
+        --labels)
+            shift
+            labelsfile=$1
+            pintarEtiquetas=1
+            [ ! -f ${labelsfile} ] && \
+            { echo "Error: El fichero ${labelsfile} no existe." >&2; usage; exit 1; }
+            ;;
+        --geoglabels)
+            shift
+            geoglabels=1
+            ;;
+
         -o)
             OVERWRITE=1
             ;;
@@ -337,7 +364,10 @@ rango=2
 lmsl=$((${normalmsl}-${rango}))
 # Umbral por el que por encima los máximos locales se considerán puntos de Alta Presión
 hmsl=$((${normalmsl}+${rango}))
-
+# Resolución a la que se resamplea la presión (y otras variables)
+presres=0.5
+# Factor de suavizado para presión (y otras variables)
+pressmooth=19
 
 
 #### Variables de las partículas de viento
@@ -346,6 +376,7 @@ hmsl=$((${normalmsl}+${rango}))
 escalaViento=0
 # CPT de colores con los que se van a pintar las partículas
 cptViento="${CPTDIR}/v10m_201404.cpt"
+#cptViento="white"
 # Edad máxima en frames para una partícula
 max_age=50
 # Densidad de partículas por cm
@@ -361,6 +392,12 @@ scale=400
 outputFile="out.mkv"
 
 
+#### Variables de etiquetas
+
+# Si se pintan etiquetas generadas por el usuario
+pintarEtiquetas=0
+# Las coordenadas de las etiquetas son geográficas (1) o cartesianas (0)
+geoglabels=0
 
 # Comprobación de que existe el software.
 command -v ${GMT} > /dev/null 2>&1 || { echo "error: ${GMT} no está instalado." >&2 && exit 1; }
@@ -368,6 +405,7 @@ command -v ${CONVERT}  > /dev/null 2>&1 || { echo "error: ${CONVERT} no está in
 command -v ${COMPOSITE}  > /dev/null 2>&1 || { echo "error: ${COMPOSITE} no está instalado." >&2 && exit 1; }
 command -v ${FFMPEG}  > /dev/null 2>&1 || { echo "error: ${FFMPEG} no está instalado." >&2 && exit 1; }
 command -v ${OGR2OGR}  > /dev/null 2>&1 || { echo "error: ${OGR2OGR} no está instalado." >&2 && exit 1; }
+command -v ${CDO}  > /dev/null 2>&1 || { echo "error: ${CDO} no está instalado." >&2 && exit 1; }
 
 parseOptions "$@"
 
@@ -435,10 +473,6 @@ else
     ylength=`${GMT} mapproject ${J} ${R} -W | awk '{print $2}'`
 fi
 
-
-#width=`echo ${J} | sed 's/-J.*\/\(.*\)c/\1/'`
-
-
 # Ajusta la escala a las dimensiones del mapa
 # Tomamos como buena la escala de 400 en las dimensiones del mapa de España (0.00596105)
 read w h < <(${GMT} mapproject ${J} ${R} -W)
@@ -447,13 +481,6 @@ awk -v scale=${scale} -f newlatlon.awk | awk '{print $1,$2; print $3,$4}' | ${GM
  awk -v scale=${scale} 'NR==1{x1=$1; y1=$2}NR==2{print 0.00596105/sqrt(($1-x1)^2+($2-y1)^2)*scale}'`
 
 
-
-
-# Determina como de cerca tiene que estar un punto de baja o alta presión, entre frames, para considerarse que es el mismo
-# En cms
-umbralPress=`awk -v w=${w} -v h=${h} 'BEGIN{printf "%.2f %.2f 0 1\n",w/2,h/2}' | ${GMT} mapproject  ${J} ${R} -I |\
-  awk -v scale=100 -f newlatlon.awk | awk '{print $1,$2; print $3,$4}' | ${GMT} mapproject ${J} ${R} |\
-   awk -v mins=${mins} 'NR==1{x1=$1; y1=$2}NR==2{print mins/30*858*($2-y1)}'`
 
 
 # Cogemos el directorio de pasada con fecha más actualizada que sea menor que el mínimo
@@ -475,9 +502,6 @@ minreal=${min}
 min=${minreal:0:8}`printf "%02d" $(( $(echo ${min:8:2}|awk '{print int($0)}')/3*3 ))`00
 # Diferencia entre el minimo real y el minimo
 desfasemin=$((${minreal:0:10}-${min:0:10}))
-
-
-
 
 
 
@@ -558,10 +582,10 @@ then
     nframes=$((${slowmotion}*180/${mins}))
 fi
 
-#Frame donde finaliza la animación
+# Frame donde finaliza la animación
 nframefinal=$((${nsteps}*${nframes}+${nframesloop}+${nframesinicio}*${nstepsinicio}))
 
-
+# Chequeamos que los valores especificados en bottomscale tienen el formato correcto
 refloat="^[+-]?[0-9]+([.][0-9]+)?$"
 if [ ${#bottomscale[*]} -gt 0 ] && [ ${#bottomscale[*]} -le ${#variablesanimacion[*]} ]
 then
@@ -582,7 +606,7 @@ then
     exit 1;
 fi
 
-
+# Chequeamos que los valores especificados en topscale tienen el formato correcto
 if [ ${#topscale[*]} -gt 0 ] && [ ${#topscale[*]} -le ${#variablesanimacion[*]} ]
 then
     for ((i=0;i<${#variablesanimacion[*]};i++))
@@ -602,23 +626,69 @@ then
     exit 1;
 fi
 
+# Indica si se calcularán los máximos y mínimos de presión o se cogeran del fichero
+calcularMaxMinPress=1
+if [ ! -z ${presscfgfile} ]
+then
+    pintarPresion=1
+
+    # Chequeamos que las opciones que vienen en el fichero de configuración de presión coinciden
+    # con las opciones que hemos pasado a los parámetros
+    [ ! -f ${presscfgfile} ] && \
+        { echo "Error: No se ha encontrado el fichero ${presscfgfile}" >&2; usage; exit 1; }
+    [ `sed -n '1p' ${presscfgfile}` != "press" ] && \
+        { echo "Error: La variable del fichero ${presscfgfile} tiene que ser 'press'" >&2; usage; exit 1; }
+    [ `sed -n '2p' ${presscfgfile}` -ne ${fechapasada} ] && \
+        { echo "Error: La fecha de pasada del fichero ${presscfgfile} es distinta que la especificada" >&2; usage; exit 1; }
+    [ ${min} -ne `sed -n '3p' ${presscfgfile} | awk '{print $1}'` ] && \
+        { echo "Error: El mínimo definido en ${presscfgfile} es didtinto al especificado" >&2; usage; exit 1; }
+    [ ${max} -ne `sed -n '3p' ${presscfgfile} | awk '{print $2}'` ] && \
+        { echo "Error: El máximo definido en ${presscfgfile} es didtinto al especificado" >&2; usage; exit 1; }
+    [ ${mins} -ne `sed -n '4p' ${presscfgfile}` ] && \
+        { echo "Error: El valor mins definido en ${presscfgfile} es distinto al especificado" >&2; usage; exit 1; }
+    [ ${geogfile} != `sed -n '5p' ${presscfgfile}` ] && \
+        { echo "Error: El fichero de configuración geográfica definido en ${presscfgfile} es distinto al especificado " >&2; usage; exit 1; }
+
+    presres=`sed -n '6p' ${presscfgfile}`
+    ! [[ ${presres} =~ ${refloat} ]] || (( `echo "${presres} <  0 " | bc -l` )) && \
+        { echo "Error: El valor preres de ${presscfgfile} tiene que ser real mayor que 0" >&2; usage; exit 1; }
+
+    umbralPress=`sed -n '7p' ${presscfgfile}`
+    ! [[ ${umbralPress} =~ ${refloat} ]] || (( `echo "${umbralPress} <  0 " | bc -l` )) && \
+        { echo "Error: El valor umbralpress de ${presscfgfile} tiene que ser real mayor que 0" >&2; usage; exit 1; }
+
+    pressmooth=`sed -n '8p' ${presscfgfile}`
+    ! [[ ${pressmooth} =~ ${repos} ]] || [ ${pressmooth} -le 0 ] || [ $(( ${pressmooth} % 2 )) -eq 0 ] && \
+        { echo "Error: El valor pressmooth de ${presscfgfile} tiene que ser positivo impar mayor que 0" >&2; usage; exit 1; }
+
+    nminframesMSL=`sed -n '9p' ${presscfgfile}`
+    ! [[ ${nminframesMSL} =~ ${repos} ]]  && \
+        { echo "Error: El valor nminframesMSL de ${presscfgfile} tiene que ser positivo" >&2; usage; exit 1; }
+
+    calcularMaxMinPress=0
+else
+
+    # Determina como de cerca tiene que estar un punto de baja o alta presión, entre frames, para considerarse que es el mismo
+    # En cms
+    umbralPress=`awk -v w=${w} -v h=${h} 'BEGIN{printf "%.2f %.2f 0 1\n",w/2,h/2}' | ${GMT} mapproject  ${J} ${R} -I |\
+      awk -v scale=100 -f newlatlon.awk | awk '{print $1,$2; print $3,$4}' | ${GMT} mapproject ${J} ${R} |\
+       awk -v mins=${mins} 'NR==1{x1=$1; y1=$2}NR==2{print mins/30*1000*($2-y1)}'`
+
+#    umbralPress=0.4
+
+    # Número mínimo de frames seguidos que debe aparecer una letra de Baja o Alta presión
+    # Está configurado como la mitad de los frames de la animación
+    nminframesMSL=$(( (`date -u -d "${max:0:8} ${max:8:4}" +%s`-`date -u -d "${min:0:8} ${min:8:4}" +%s`)/(${mins}*60*2) ))
+#    nminframesMSL=20
+
+fi
+# Establecemos la distancia mínima entre letras como el umbral
+dminletras=${umbralPress}
 
 
-
-#echo ${variablesanimacion[*]}
-#echo ${bottomscale[*]}
-#
-#exit
 
 
 TMPDIR="/tmp"
-
-
-#OUTPUTS_DIR="/home/juan/Proyectos/pruebas/gmt/OUTPUTS/"
-#outputFile="${OUTPUTS_DIR}/viento-meteored2.mkv"
-#outputFile="${OUTPUTS_DIR}/villena/acumnievespain-meteored.mkv"
-#outputFile="${OUTPUTS_DIR}/$4"
-
 
 # Diretorio temporal
 TMPDIR=${TMPDIR}/`basename $(type $0 | awk '{print $3}').$$`
@@ -676,6 +746,7 @@ then
         cargarVariable ${variablefondo}
 
         tcolor="none"
+        # Recortamos la escala de la variable al valor especificado para esa variable en bottomscale
         [ ${ivar} -lt ${#bottomscale[*]} ] && [ ${bottomscale[${ivar}]} != "N" ] && \
             {
                 ${GMT} makecpt -C${cptGMT} -Fr | awk -v umbral=${bottomscale[${ivar}]} '$1~/F|N|B/||$1>=umbral{print $0}' > ${TMPDIR}/bottom.cpt;
@@ -683,6 +754,7 @@ then
                 tcolor=`sed -n '/^B/p' ${cptGMT} | tr "/" "," | awk '{printf "rgb(%s)",$2}'`
             };
 
+        # Recortamos la escala de la variable al valor especificado para esa variable en topscale
         [ ${ivar} -lt ${#topscale[*]} ] && [ ${topscale[${ivar}]} != "N" ] && \
             {
 
@@ -692,6 +764,8 @@ then
                 then
                     tcolor=`sed -n '/^F/p' ${cptGMT} | tr "/" "," | awk '{printf "rgb(%s)",$2}'`
                 else
+                    # Si ya se ha recortado con bottomscale cambiamos el valor Forward al Below de la escala anterior
+                    # para que tenga el mismo color y se haga transparente
                     Bcolor=`sed -n '/^B/p' ${cptGMT} | awk '{print $2}' | sed 's/\//\\\\\//g'`
                     sed "s/^F.*$/F ${Bcolor}/" ${cptGMT} > ${TMPDIR}/kk.cpt
                     mv  ${TMPDIR}/kk.cpt  ${cptGMT}
@@ -783,9 +857,11 @@ then
         [ ${ivar} -ge ${#topscale[*]} ] || [ ${topscale[${ivar}]} == "N" ] && \
             calcularMinMax "${variablefondo}" ${min} ${max} ${stepinterp}
 
+        # Si se ha especificado un valor en bottomscale se recorta la escala generada a ese valor
         [ ${ivar} -lt ${#bottomscale[*]} ] && [ ${bottomscale[${ivar}]} != "N" ] && \
             zmin=${bottomscale[${ivar}]}
 
+        # Si se ha especificado un valor en topscale se recorta la escala generada a ese valor
         [ ${ivar} -lt ${#topscale[*]} ] && [ ${topscale[${ivar}]} != "N" ] && \
             zmax=${topscale[${ivar}]}
 
@@ -844,24 +920,26 @@ then
 
     replicarFrames "msl"
 
-    # Número mínimo de frames seguidos que debe aparecer una letra de Baja o Alta presión
-    # Está configurado como la mitad de los frames de la animación
-    nminframesMSL=$(( (`date -u -d "${max:0:8} ${max:8:4}" +%s`-`date -u -d "${min:0:8} ${min:8:4}" +%s`)/(${mins}*60*4) ))
+    # Si hemos pasado un fichero de configuración de presión no habrá que volver a hacer el cálculo de máximos y mínimos
+    if [ -z ${calcularMaxMinPress} ] || [ ${calcularMaxMinPress} -eq 1 ]
+    then
+        printMessage "Calculando máximos/mínimos de MSL desde ${min} hasta ${max}"
 
+        # Filtramos los máximos A y lo mínimos B quitando aquellos que aparezcan menos frames de nminframes. Esto evita que aparezcan A y B que aparecen y desaparecen rapidamente
+        # 1. Pasamos las coordenadas geográficas a cartesianas
+        # 2. Le ponemos un ID a las letras identificando cuales son las mismas entre distintas fechas. Si la distancia entre distintas fechas
+        # de dos letras es menor que umbralPress consideramos que es la misma letra
+        # 3. Descartamos aquellas que no aparezcan en mas de nminframes consecutivas. Suavizamos también el movimiento de las letras y hacemos
+        # que aparezcan y desaparezcan también de forma suave
+        paste <(awk '{print $1"\t"$2"\t"$3}' ${TMPDIR}/maxmins.txt) <(awk '{print $2,$3,$4,$5}' ${TMPDIR}/maxmins.txt | ${GMT} mapproject ${J} ${R}) > ${TMPDIR}/maxmins2.txt
+        awk -v mins=${mins} -v umbral=${umbralPress} -f filtrarpresion.awk ${TMPDIR}/maxmins2.txt > ${TMPDIR}/maxmins3.txt
+        awk -v n=${nminframesMSL} -f filtrarletras.awk ${TMPDIR}/maxmins3.txt | sort -k1,1 |\
+         awk -v N=5 -v nf=4  -v maxfecha=${max} -v minfecha=${minreal} -f suavizarletras.awk> ${TMPDIR}/maxmins4.txt
+    else
 
-    printMessage "Calculando máximos/mínimos de MSL desde ${min} hasta ${max}"
+        cp `dirname $(realpath ${presscfgfile} )`/`basename ${presscfgfile} .cfg`.labels.txt ${TMPDIR}/maxmins4.txt
 
-    # Filtramos los máximos A y lo mínimos B quitando aquellos que aparezcan menos frames de nminframes. Esto evita que aparezcan A y B que aparecen y desaparecen rapidamente
-    # 1. Pasamos las coordenadas geográficas a cartesianas
-    # 2. Le ponemos un ID a las letras identificando cuales son las mismas entre distintas fechas. Si la distancia entre distintas fechas
-    # de dos letras es menor que umbralPress consideramos que es la misma letra
-    # 3. Descartamos aquellas que no aparezcan en mas de nminframes consecutivas. Suavizamos también el movimiento de las letras y hacemos
-    # que aparezcan y desaparezcan también de forma suave
-    paste <(awk '{print $1"\t"$2"\t"$3}' ${TMPDIR}/maxmins.txt) <(awk '{print $2,$3,$4,$5}' ${TMPDIR}/maxmins.txt | ${GMT} mapproject ${J} ${R}) > ${TMPDIR}/maxmins2.txt
-    awk -v umbral=${umbralPress} -f filtrarpresion.awk ${TMPDIR}/maxmins2.txt > ${TMPDIR}/maxmins3.txt
-    awk -v mins=${mins} -v n=${nminframesMSL} -f letrasconsecutivas.awk ${TMPDIR}/maxmins3.txt | sort -k1,1 |\
-     awk -v N=5 -v nf=4  -v maxfecha=${max} -v minfecha=${minreal} -f suavizarletras.awk> ${TMPDIR}/maxmins4.txt
-
+    fi
 
     filelines=`wc -l ${TMPDIR}/maxmins4.txt | awk '{print $1}'`
 
@@ -894,12 +972,10 @@ then
                 printMessage "Generando frame de máximos/mínimos para fecha ${fecha}"
                 pintarPresionAyB
 
-
                 cp ${tmpFile} ${TMPDIR}/mslhl`printf "%03d\n" ${nframe}`.png
 
                 nframe=$((${nframe}+1))
             fi
-
 
             fecha=`date -u --date="${fecha:0:8} ${fecha:8:4} +${mins} minutes" +%Y%m%d%H%M`
         done
@@ -915,6 +991,77 @@ then
 
 
 fi
+
+
+
+# Pintamos las etiquetas
+if [ ${pintarEtiquetas} -eq 1 ]
+then
+
+
+    # Usamos la J y R cartesianas
+    J="-JX${xlength}c/${ylength}c"
+    R=`grdinfo ${dataFileDST} -Ir -C` ####
+
+
+    fecha=${min}
+    nframe=0
+
+
+    comando="cat"
+    # Si el mapa es global hay que pintar las etiquetas con perspectiva
+    if [ ! -z ${global} ] && [  ${global} -eq 1 ]
+    then
+        function pintarEtiquetas {
+            pintarEtiquetasGlobal
+        }
+        comando="${GMT} mapproject -JX${xlength}c/${ylength}c ${RAMP}"
+    fi
+
+    # Si se ha indicado, que son geográficas se deben pasar las coordenadas a cartesianas
+    if [ ! -z ${geoglabels} ] && [  ${geoglabels} -eq 1 ]
+    then
+
+        paste -d ";" ${labelsfile} <(awk -F ";" 'BEGIN{OFS=";"}{print $2,$3}' ${labelsfile} |\
+         ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando} | tr "\t" ";" ) |\
+         awk -F ";" 'BEGIN{OFS=";"}{print $1,$13,$14,$4,$5,$6,$7,$8,$9,$10,$11,$12}' > ${TMPDIR}/kketiquetas
+        labelsfile="${TMPDIR}/kketiquetas"
+    fi
+    printMessage "Generando los frames de etiquetas desde ${min} hasta ${max} cada ${mins} minutos"
+
+
+    while [ ${fecha} -le ${max} ]
+    do
+
+
+#        grep ^${fecha} ${labelsfile} | awk -F ";" 'BEGIN{OFS=";"}{print $2,$3,$4,$5,$6,$7,$8}' > ${TMPDIR}/etiquetas.txt
+        # El comando cat es para que no devuelva un error 1 si no encuentra la fecha y no se salga
+        grep ^${fecha} ${labelsfile} | cat > ${TMPDIR}/etiquetas.txt
+
+        tmpFile="${TMPDIR}/${fecha}-labels.png"
+
+        if [ ${fecha} -ge ${minreal} ]
+        then
+            printMessage "Generando frame de etiquetas para fecha ${fecha}"
+            pintarEtiquetas
+
+
+            cp ${tmpFile} ${TMPDIR}/labels`printf "%03d\n" ${nframe}`.png
+
+            nframe=$((${nframe}+1))
+        fi
+
+
+        fecha=`date -u --date="${fecha:0:8} ${fecha:8:4} +${mins} minutes" +%Y%m%d%H%M`
+    done
+
+    replicarFrames "labels"
+
+fi
+
+
+
+
 
 # Pintamos las partículas de viento
 if [ ${pintarViento} -eq 1 ]
@@ -1186,8 +1333,9 @@ while [ ${fecha} -le ${fechamax} ]
 do
     outputpng=${TMPDIR}/rotulo-`printf "%03d\n" ${nframerotulo}`.png
 
+#    TZ=:America/Mexico_City
     # Generamos el texto con la fecha y hora local y en el idioma seleccionado en el fichero de configuración de estilo
-    rotuloFecha=`LANG=${idioma} TZ=:Europe/Madrid date -d @$(date  -u -d "${fecha:0:8} ${fecha:8:2}" +%s) +"%A %d, %H:00" | sed -e "s/\b\(.*\)/\u\1/g"`
+    rotuloFecha=`LANG=${idioma} TZ=:${timezone} date -d @$(date  -u -d "${fecha:0:8} ${fecha:8:2}" +%s) +"%A %d, %H:00" | sed -e "s/\b\(.*\)/\u\1/g"`
 
     printMessage "Generando frame con el texto para la fecha ${fecha}"
 
@@ -1332,6 +1480,14 @@ then
     framesPress="-f image2 -i ${TMPDIR}/msl%03d.png"
 fi
 
+# Etiquetas del usuario
+if [ ${pintarEtiquetas} -eq 1 ]
+then
+    filtro="${filtro}[$((${nframerotulo}+${nlogos}+${pintarIntensidad}+${pintarPresion}+${pintarViento}+${nescalas}+${global}+2))]${fadefilter}[labels];[out][labels]overlay[out];"
+    frameslabels="-f image2 -i ${TMPDIR}/labels%03d.png"
+fi
+
+
 # Anotaciones del final
 if [ ${pintarAnotacionesFinal} -eq 1 ]
 then
@@ -1412,7 +1568,7 @@ printMessage "Generando vídeo final....."
 
 # Generamos el vídeo del final
 ${FFMPEG} -y -f image2 -i ${fondoPNG} ${framesViento} ${escalas} -f image2 -i ${framescartel} ${opciones} ${logos} -i ${fondomar} \
- ${framesUV} ${framesPress} ${frameSombra} ${framesanotaciones} -filter_complex ${filtro}  ${outputFile} 2>> ${errorsFile}
+ ${framesUV} ${framesPress} ${frameSombra} ${framesanotaciones} ${frameslabels} -filter_complex ${filtro}  ${outputFile} 2>> ${errorsFile}
 
 printMessage "¡Se ha generado el vídeo `basename ${outputFile}` con exito!"
 

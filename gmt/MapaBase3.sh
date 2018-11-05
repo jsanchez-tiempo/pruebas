@@ -586,9 +586,10 @@ else
     then
         echo "error: No existe el archivo de altitud ${GLOBEFILE}." >&2 && exit 1;
     fi
-    resolucion=`awk -v grados=${dlat} -v z=${zoom} 'BEGIN{z=int(z); print int(3600*grados*z+0.5); }'`
+    resolucion=`awk -v grados=${dlat} -v z=${zoom} 'BEGIN{ print int(3600*grados*z+0.5); }'`
     resformat=`awk -v secs=${resolucion} 'BEGIN{if(secs%60==0)print secs/60"m"; else print secs"s";}'`
     printMessage "Resolución calculada a partir del zoom: ${resformat}"
+#    exit
 fi
 
 

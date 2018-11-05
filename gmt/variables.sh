@@ -7,6 +7,11 @@ variables[uv,fpintar]="pintarViento"
 variables[uv,cpt]="cpt/v10m_201404.cpt"
 variables[uv,unidad]="km/h"
 
+variables[uv300,fprocesar]="procesarViento300"
+variables[uv300,fpintar]="pintarViento300"
+variables[uv300,cpt]="cpt/velv300_201810.cpt"
+variables[uv300,unidad]="km/h"
+
 variables[uvracha,fprocesar]="procesarRachasViento"
 variables[uvracha,fpintar]="pintarViento"
 variables[uvracha,cpt]="cpt/v10m_201404.cpt"
@@ -26,6 +31,8 @@ variables[t850,fprocesar]="procesarT850"
 variables[t850,fpintar]="pintarT850"
 variables[t850,cpt]="cpt/temp850.cpt"
 variables[t850,unidad]="°C"
+
+variables[press,fprocesar]="procesarPresion"
 
 variables[nubes,fprocesar]="procesarNubes"
 variables[nubes,fpintar]="pintarNubes"

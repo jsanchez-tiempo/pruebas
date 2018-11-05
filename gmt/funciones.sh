@@ -972,7 +972,7 @@ function calcularMaximos {
     fi
 
     awk '{print $1,$2,$3}'  ${TMPDIR}/contourlabels.txt  |\
-     awk -v xsize=${xsize} -v ysize=${ysize} -v xlength=${xlength} -v ylength=${ylength} -f filtrarintersecciones.awk \
+     awk -v xsize=${xsize} -v ysize=${ysize} -v xlength=${xlength} -v ylength=${ylength} -f awk/filtrarintersecciones.awk \
      | head -n ${nmax} > ${TMPDIR}/Tlabels.txt
 
 
@@ -1039,7 +1039,7 @@ function calcularMaximos {
 #    fi
 #
 #    awk '{print $1,$2,$3}'  ${TMPDIR}/contourlabels.txt  |\
-#     awk -v xsize=${xsize} -v ysize=${ysize} -v xlength=${xlength} -v ylength=${ylength} -f filtrarintersecciones.awk \
+#     awk -v xsize=${xsize} -v ysize=${ysize} -v xlength=${xlength} -v ylength=${ylength} -f awk/filtrarintersecciones.awk \
 #     | head -n ${nmax} > ${TMPDIR}/Tlabels.txt
 #
 #
@@ -1065,7 +1065,7 @@ function calcularMinimosDanas {
     mv ${TMPDIR}/kkcontourlabels.txt ${TMPDIR}/contourlabels.txt
 
     awk '{if($4=="L") printf "%s %s %.0f\n",$1,$2,$5}' ${TMPDIR}/contourlabels.txt  | awk -v xsize=${xsize} -v ysize=${ysize} -v xlength=${xlength} -v ylength=${ylength} \
-     -f filtrarintersecciones.awk > ${TMPDIR}/Tlabels.txt
+     -f awk/filtrarintersecciones.awk > ${TMPDIR}/Tlabels.txt
 
 }
 
@@ -1113,7 +1113,7 @@ function pintarMaximosPREC {
 
     ########### HAY QUE QUITAR EL MAPPROJECT CUANDO SE REPROYECTEN LOS GRIDS !!!!!!
 #    awk '{if($4=="H") printf "%s %s %.0f\n",$1,$2,$5}' ${TMPDIR}/contourlabels.txt | sort -k3,3 -n -r | head -n 15 | ${GMT} mapproject -R -J > ${TMPDIR}/Tlabels.txt
-    awk -F "," 'NR>1{print $1,$2,$3}'  ${TMPDIR}/coordsfilter.csv  | sort -k3,3 -n -r | ${GMT} mapproject ${JGEOG} ${RGEOG} | awk  -f filtrarintersecciones.awk  | head -n 10 > ${TMPDIR}/Tlabels.txt
+    awk -F "," 'NR>1{print $1,$2,$3}'  ${TMPDIR}/coordsfilter.csv  | sort -k3,3 -n -r | ${GMT} mapproject ${JGEOG} ${RGEOG} | awk  -f awk/filtrarintersecciones.awk  | head -n 10 > ${TMPDIR}/Tlabels.txt
 
 
 

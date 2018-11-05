@@ -464,6 +464,19 @@ done
     { echo "Error: No se ha encontrado el fichero ${fronterasPNGb}" >&2; usage; exit 1; }
 
 
+# Comprobamos que hay archivos de fronteras
+array=(`echo ${cod} | tr '.' ' '`)
+i=$((${#array[@]}-1))
+if [ ! -z ${cod} ] && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.shp ] && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.dbf ] \
+    && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.dpg ] && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.shx ] \
+    && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.prj ]
+then
+    echo "error: No se han encontrado los archivos de límites geográficos gadm28_adm${i}.* ." >&2
+    exit 1
+fi
+
+
+
 # Calculamos la longitud cartesiana y en cms. Si es global, depende de los pixeles de x e y. Si no lo es,
 # la sacamos con mapproject.
 if [ ! -z ${global} ] && [  ${global} -eq 1 ]
@@ -477,7 +490,7 @@ fi
 # Tomamos como buena la escala de 400 en las dimensiones del mapa de España (0.00596105)
 read w h < <(${GMT} mapproject ${J} ${R} -W)
 scale=`awk -v w=${w} -v h=${h} 'BEGIN{printf "%.2f %.2f 1 1\n",w/2,h/2}' | ${GMT} mapproject ${J} ${R} -I |\
-awk -v scale=${scale} -f newlatlon.awk | awk '{print $1,$2; print $3,$4}' | ${GMT} mapproject ${J} ${R} |\
+awk -v scale=${scale} -f awk/newlatlon.awk | awk '{print $1,$2; print $3,$4}' | ${GMT} mapproject ${J} ${R} |\
  awk -v scale=${scale} 'NR==1{x1=$1; y1=$2}NR==2{print 0.00596105/sqrt(($1-x1)^2+($2-y1)^2)*scale}'`
 
 
@@ -671,7 +684,7 @@ else
     # Determina como de cerca tiene que estar un punto de baja o alta presión, entre frames, para considerarse que es el mismo
     # En cms
     umbralPress=`awk -v w=${w} -v h=${h} 'BEGIN{printf "%.2f %.2f 0 1\n",w/2,h/2}' | ${GMT} mapproject  ${J} ${R} -I |\
-      awk -v scale=100 -f newlatlon.awk | awk '{print $1,$2; print $3,$4}' | ${GMT} mapproject ${J} ${R} |\
+      awk -v scale=100 -f awk/newlatlon.awk | awk '{print $1,$2; print $3,$4}' | ${GMT} mapproject ${J} ${R} |\
        awk -v mins=${mins} 'NR==1{x1=$1; y1=$2}NR==2{print mins/30*1000*($2-y1)}'`
 
 #    umbralPress=0.4
@@ -932,9 +945,9 @@ then
         # 3. Descartamos aquellas que no aparezcan en mas de nminframes consecutivas. Suavizamos también el movimiento de las letras y hacemos
         # que aparezcan y desaparezcan también de forma suave
         paste <(awk '{print $1"\t"$2"\t"$3}' ${TMPDIR}/maxmins.txt) <(awk '{print $2,$3,$4,$5}' ${TMPDIR}/maxmins.txt | ${GMT} mapproject ${J} ${R}) > ${TMPDIR}/maxmins2.txt
-        awk -v mins=${mins} -v umbral=${umbralPress} -f filtrarpresion.awk ${TMPDIR}/maxmins2.txt > ${TMPDIR}/maxmins3.txt
-        awk -v n=${nminframesMSL} -f filtrarletras.awk ${TMPDIR}/maxmins3.txt | sort -k1,1 |\
-         awk -v N=5 -v nf=4  -v maxfecha=${max} -v minfecha=${minreal} -f suavizarletras.awk> ${TMPDIR}/maxmins4.txt
+        awk -v mins=${mins} -v umbral=${umbralPress} -f awk/filtrarpresion.awk ${TMPDIR}/maxmins2.txt > ${TMPDIR}/maxmins3.txt
+        awk -v n=${nminframesMSL} -f awk/filtrarletras.awk ${TMPDIR}/maxmins3.txt | sort -k1,1 |\
+         awk -v N=5 -v nf=4  -v maxfecha=${max} -v minfecha=${minreal} -f awk/suavizarletras.awk> ${TMPDIR}/maxmins4.txt
     else
 
         cp `dirname $(realpath ${presscfgfile} )`/`basename ${presscfgfile} .cfg`.labels.txt ${TMPDIR}/maxmins4.txt
@@ -1134,7 +1147,7 @@ then
 
     # Para cada partícula sacamos su componentes U y V y a través de ellas y de sus coordenadas calculamos el nuevo punto donde se va a situar
     awk '{print $1,$2}' ${TMPDIR}/particulas.txt | ${GMT} grdtrack -G${ncFileU} -G${ncFileV} | \
-    awk -v scale=${scale}  -f newlatlon.awk | awk -v umbral=${bottomwind} '$5>=umbral' > ${TMPDIR}/dparticulas.txt
+    awk -v scale=${scale}  -f awk/newlatlon.awk | awk -v umbral=${bottomwind} '$5>=umbral' > ${TMPDIR}/dparticulas.txt
 
     # Filtramos las partículas para que solo se pinten las que sean superior a determinado umbral
     awk -v umbral=${bottomwind} '$5>=umbral' ${TMPDIR}/dparticulas.txt > ${TMPDIR}/dparticulasfilter.txt
@@ -1164,7 +1177,7 @@ then
     # Primero hay que pasar las coordenadas geógraficas a cartesianas
     paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulasfilter.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando} )\
      <(awk '{print $3,$4}' ${TMPDIR}/dparticulasfilter.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando} ) \
-     <(awk -fz2color.awk <(${GMT} makecpt -Fr -C${cptViento})  ${TMPDIR}/dparticulasfilter.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
+     <(awk -fawk/z2color.awk <(${GMT} makecpt -Fr -C${cptViento})  ${TMPDIR}/dparticulasfilter.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
      awk -v w=${w} -v h=${h} -v xsize=${xsize} -v ysize=${ysize} '{printf "stroke %s line %d,%d %d,%d\n", $5, xsize*$1/w, ysize*(h-$2)/h, xsize*$3/w, ysize*(h-$4)/h}' > ${TMPDIR}/lineas.txt
 
     # Pintamos las líneas sobre un frame transparente
@@ -1257,7 +1270,7 @@ then
 
             # Para cada partícula sacamos su componentes U y V y a través de ellas y de sus coordenadas calculamos el nuevo punto donde se va a situar
             awk '{print $1,$2}' ${TMPDIR}/particulas.txt | ${GMT} grdtrack  -G${ncFileU} -G${ncFileV} | \
-             awk -v scale=${scale} -f newlatlon.awk  > ${TMPDIR}/dparticulas.txt
+             awk -v scale=${scale} -f awk/newlatlon.awk  > ${TMPDIR}/dparticulas.txt
 
             # Filtramos las partículas para que solo se pinten las que sean superior a determinado umbral
             awk -v umbral=${bottomwind} '$5>=umbral' ${TMPDIR}/dparticulas.txt > ${TMPDIR}/dparticulasfilter.txt
@@ -1277,7 +1290,7 @@ then
             # Primero hay que pasar las coordenadas geógraficas a cartesianas
             paste <( awk '{print $1,$2}' ${TMPDIR}/dparticulasfilter.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando})\
             <(awk '{print $3,$4}' ${TMPDIR}/dparticulasfilter.txt | ${GMT} mapproject ${RGEOG} ${JGEOG} | ${comando}) \
-            <(awk -fz2color.awk <(${GMT} makecpt -Fr -C${cptViento}) ${TMPDIR}/dparticulasfilter.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
+            <(awk -fawk/z2color.awk <(${GMT} makecpt -Fr -C${cptViento}) ${TMPDIR}/dparticulasfilter.txt | awk '{printf "rgb(%s,%s,%s)\n",$1,$2,$3}') |\
             awk -v w=${w} -v h=${h} -v xsize=${xsize} -v ysize=${ysize} '{printf "stroke %s line %d,%d %d,%d\n", $5, xsize*$1/w, ysize*(h-$2)/h, xsize*$3/w, ysize*(h-$4)/h}' > ${TMPDIR}/lineas.txt
 
             # Le restamos 1 al tiempo de vida de todas las partículas

@@ -34,18 +34,29 @@ function usage() {
       echo "                  'fecha' debe tener el formato 'yyyyMMddhhmm', 'x' e 'y' pueden ser coordenadas cartesianas o "
       echo "                  geográficas y 'smooth' (opcional) es un valor de transparencia entre 0 (transparente) y 1 (opaco)."
       echo "                  Si no se especifica ningún fichero se leera desde la entrada estandar."
+      echo
       echo " -n nombre:       Texto que va a llevar la etiqueta. Por defecto 'titulo'."
+      echo
       echo " -c color:        Color del texto de la etiqueta. Por defecto 'black'."
+      echo
       echo " -b bgcolor:      Color de la caja que contiene al texto en la etiqueta. Por defecto 'transparent'."
+      echo
       echo " -f fontsize:     Tamaño de fuente del texto en la etiqueta. Por defecto 30."
+      echo
       echo " -g geogcfgfile:  Fichero de configuración geográfica. Trasforma las coordenadas cartesianas de 'filecoords' a "
       echo "                  coordenadas geográficas en base al este fichero. Por defecto no se hace esta transformación. "
+      echo
       echo " -m minutos:      Minutos de resampleo. Hace un resampleo cada 'minutos' minutos si la distancia horaria de "
       echo "                  las fechas entre filas es mayor, utilizando interpolación cúbica. Por defecto nos se hace. "
+      echo
       echo " --xsize=xsise:   Ancho de la caja que contiene el texto de la etiqueta. Por defecto 150."
+      echo
       echo " --ysize=ysise:   Alto de la caja que contiene el texto de la etiqueta. Por defecto 50."
+      echo
       echo " --xdes=xdes:     Desplazamiento X en pixeles de la etiqueta. Por defecto 0."
+      echo
       echo " --ydes=ydes:     Desplazamiento Y en pixeles de la etiqueta. Por defecto 0."
+      echo
       echo " -h:              Muestra esta ayuda."
       echo
       echo "El fichero default.cfg define las variables de configuración de este comando."

@@ -39,7 +39,7 @@ function procesarGH500 {
     ${GMT} grdconvert -Rd ${dataFileDST}\?gh ${dataFileDST} 2>> ${errorsFile}
     ${GMT} grdmath ${Rgeog} ${dataFileDST} 9.81 DIV 10 DIV = ${dataFileDST} 2>> ${errorsFile}
 
-    ${GMT} grdsample -I0.5 ${dataFileDST}  -G${dataFileDST}
+#    ${GMT} grdsample -I0.5 ${dataFileDST}  -G${dataFileDST}
 
 }
 
@@ -48,7 +48,7 @@ function pintarGH500 {
 
     dataFile=$1
 
-    ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb7 -Nr
+    ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb9 -Nr
 
     [ ! -z ${dpi} ] && E="-E${dpi}"
     ${GMT} grdimage ${TMPDIR}/kk  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile}

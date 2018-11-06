@@ -1,7 +1,9 @@
 #!/bin/bash
 
-#
-#ncFile=$1
+
+
+source defaults.cfg
+
 read zmin zmax < <(echo $1 | tr "/" " ")
 cptFile=$2
 output=$3
@@ -53,9 +55,9 @@ then
 fi
 
 # Obtenemos el valor minimo y máximo del grid para pintar solo el rango de temperaturas que aparecen en el mapa
-#read zmin zmax < <(gmt grdinfo -C -L0 ${ncFile} | awk '{print $6,$7}')
-read min max sup < <(gmt makecpt -C${cptFile} -N | awk -v min=${zmin} -v max=${zmax} 'NR==1 && min<$1 {printf "%s ",$1} min>=$1 && min<$3 {printf "%s ",$1} max<=$3 && max>$1{print $3" "0} END{if(max>$3) print $3" "1}')
-gmt makecpt -C${cptFile} -G${min}/${max} -N ${I} -Fr > ${dir}/tmp.cpt
+#read zmin zmax < <(${GMT} grdinfo -C -L0 ${ncFile} | awk '{print $6,$7}')
+read min max sup < <(${GMT} makecpt -C${cptFile} -N | awk -v min=${zmin} -v max=${zmax} 'NR==1 && min<$1 {printf "%s ",$1} min>=$1 && min<$3 {printf "%s ",$1} max<=$3 && max>$1{print $3" "0} END{if(max>$3) print $3" "1}')
+${GMT} makecpt -C${cptFile} -G${min}/${max} -N ${I} -Fr > ${dir}/tmp.cpt
 
 
 # calculamos la altura de la escala multiplicando 45 pixeles por el número de divisiones
@@ -92,7 +94,7 @@ i=0
 #echo $sup
 if [ ${sup} -eq 1 ]
 then
-    color=`gmt makecpt -Fr -C${cptFile} | sed -n '/^\s*F/p' | awk '{print "rgb("$2")"}'| tr "/" ","`
+    color=`${GMT} makecpt -Fr -C${cptFile} | sed -n '/^\s*F/p' | awk '{print "rgb("$2")"}'| tr "/" ","`
 #    echo $color
     if [ ${horizontal} -eq 1 ]
     then
@@ -101,7 +103,7 @@ then
         dims="0,$((${sizediv}/2-1)) $((${scalewidth}/2)),$(( ${i}*${sizediv}-1)) $((${scalewidth}-1)),$((${sizediv}/2-1))"
     fi
 
-    convert ${output} -stroke black -fill "${color}" -draw "polygon ${dims}" ${output}
+    ${CONVERT} ${output} -stroke black -fill "${color}" -draw "polygon ${dims}" ${output}
 fi
 
 
@@ -117,7 +119,7 @@ do
         dims="0,$((${offset}+$i*${sizediv}-1)), $((${scalewidth}-1)),$(( ${offset}+(${i}+1)*${sizediv}-1 ))"
     fi
 
-    convert ${output} -stroke black -fill "${color}" -draw "rectangle ${dims}" ${output}
+    ${CONVERT} ${output} -stroke black -fill "${color}" -draw "rectangle ${dims}" ${output}
     i=$(($i+1))
 done < <(awk '{print "rgb("$2")"}' ${dir}/tmp.cpt| tr "/" ",")
 
@@ -134,8 +136,8 @@ else
     dims="$((${scalewidth-1})),${offset} $((${scalewidth}/2)),0 0,${offset} 0,$((${scaleheight}-1)) $((${scalewidth-1})),$((${scaleheight}-1))"
 fi
 
-#convert ${output} -stroke black -strokewidth 2 -fill "transparent" -draw "rectangle 0,${offset}, 34,$((${scaleheight}-1))" ${output}
-convert ${output} -stroke black -strokewidth 2 -fill "transparent" -draw "polygon ${dims}" ${output}
+#${CONVERT} ${output} -stroke black -strokewidth 2 -fill "transparent" -draw "rectangle 0,${offset}, 34,$((${scaleheight}-1))" ${output}
+${CONVERT} ${output} -stroke black -strokewidth 2 -fill "transparent" -draw "polygon ${dims}" ${output}
 #exit
 
 
@@ -184,7 +186,7 @@ fi
 
 
 
-convert -size ${xsize}x${ysize} xc:none -fill 'gray' -draw "polygon ${dims}" -blur 0x1 ${dir}/fescala.png
+${CONVERT} -size ${xsize}x${ysize} xc:none -fill 'gray' -draw "polygon ${dims}" -blur 0x1 ${dir}/fescala.png
 composite -geometry ${dimscomposite} ${output} ${dir}/fescala.png ${output}
 
 #exit
@@ -206,7 +208,7 @@ do
 
     fi
 
-    convert -size ${dimsnumero} xc:none -font Helvetica-Bold -pointsize 24 -fill white -gravity ${pos} \
+    ${CONVERT} -size ${dimsnumero} xc:none -font Helvetica-Bold -pointsize 24 -fill white -gravity ${pos} \
     -annotate +0+0 "${rotulo}" \( +clone -background none -shadow 80x2+1+1 \) +swap  \
     -flatten miff:- | composite -geometry ${posdims} - ${output} ${output}
 
@@ -229,7 +231,7 @@ else
 
 fi
 rotulo=`awk '{print $3}'  ${dir}/tmp.cpt | tail -n 1`
-convert -size ${dimsnumero} xc:none -font Helvetica-Bold -pointsize 24 -fill white -gravity ${pos} \
+${CONVERT} -size ${dimsnumero} xc:none -font Helvetica-Bold -pointsize 24 -fill white -gravity ${pos} \
 -annotate +0+0 "${rotulo}" \( +clone -background none -shadow 80x2+1+1 \) +swap  \
 -flatten miff:- | composite -geometry ${posdims} - ${output} ${output}
 
@@ -243,7 +245,7 @@ else
     dims="+0+${dtitulo}"
 fi
 
-convert -size 75x25 xc:none -font Helvetica-Bold -pointsize 24 -fill white -gravity west \
+${CONVERT} -size 75x25 xc:none -font Helvetica-Bold -pointsize 24 -fill white -gravity west \
 -annotate +0+0 ${unidad} \( +clone -background none -shadow 80x2+1+1 \) +swap  \
 -flatten miff:- | composite -geometry ${dims} - ${output} ${output}
 
@@ -260,7 +262,7 @@ fi
 if [ ! -z ${titulo} ]
 then
     # Pintamos el rótulo de la unidad
-    convert -size 95x25 xc:none -font Helvetica-Bold -pointsize 26 -fill white -gravity west \
+    ${CONVERT} -size 95x25 xc:none -font Helvetica-Bold -pointsize 26 -fill white -gravity west \
     -annotate +0+0 ${titulo} \( +clone -background none -shadow 80x2+1+1 \) +swap  \
     -flatten miff:- | composite -geometry ${dims} - ${output} ${output}
 fi

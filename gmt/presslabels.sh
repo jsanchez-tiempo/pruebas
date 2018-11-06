@@ -43,36 +43,51 @@ function usage() {
       echo "                    [-r] [-o] [-h] [--press_minframes nframes] [--press_threshold threshold] [--press_resolution res]"
       echo "                    [--press_smooth smooth] [--pressexclude idsexclude] [--clean]"
       echo
-      echo " fechainicio :    Fecha en la que comenzará la animación del vídeo. En formato yyyyMMddhh (UTC)."
-      echo " fechafinal :     Fecha en la que finalizará la animación del vídeo. En formato yyyyMMddhh (UTC)."
-      echo " -f archivo:      Prefijo de los nombres de los ficheros de salida. Por defecto out."
-      echo " -d fechapasada:  Fecha de la pasada de la que se van a coger los grids de entrada. Por defecto se coge la"
-      echo "                  última pasada disponible que sea menor que la fecha de inicio. En formato yyyyMMddhh (UTC)."
-      echo " -g geogcfgfile:  Fichero de configuración geográfica. Se pueden generar con el script MapaBase3.sh."
-      echo "                  Por defecto spain3.cfg."
-      echo " -m minutos:      Minutos en los que se interpolará un frame en la animación. Debe ser un divisor de 60. Un valor menor hace "
-      echo "                  que la animación haga una transición más suave pero la generación del vídeo será más lenta. Por "
-      echo "                  defecto es 60."
-      echo " -v variable:     Variable de la que queremos sacar su máximos y mínimos. Por defecto es presión."
-      echo " -r:              Se repite la ejecución anterior. No tendrá que volver a procersar los grids, tomando como base el "
-      echo "                  el último directorio temporal. Con esta opción activada solo se pueden modificar los parámetros "
-      echo "                  --press_minframes y --press_smooth."
-      echo "--press_minframes nframes: Número mínimo de frames consecutivos en los que debe aparecer una letra. Por defecto es la "
-      echo "                  la cuarta parte del número total de frames."
+      echo " fechainicio :               Fecha en la que comenzará la animación del vídeo. En formato yyyyMMddhh (UTC)."
+      echo
+      echo " fechafinal :                Fecha en la que finalizará la animación del vídeo. En formato yyyyMMddhh (UTC)."
+      echo
+      echo " -f archivo:                 Prefijo de los nombres de los ficheros de salida. Por defecto out."
+      echo
+      echo " -d fechapasada:             Fecha de la pasada de la que se van a coger los grids de entrada. Por defecto se coge la"
+      echo "                             última pasada disponible que sea menor que la fecha de inicio. En formato yyyyMMddhh (UTC)."
+      echo
+      echo " -g geogcfgfile:             Fichero de configuración geográfica. Se pueden generar con el script MapaBase3.sh."
+      echo "                             Por defecto spain3.cfg."
+      echo
+      echo " -m minutos:                 Minutos en los que se interpolará un frame en la animación. Debe ser un divisor de 60. Un valor menor hace "
+      echo "                             que la animación haga una transición más suave pero la generación del vídeo será más lenta. Por "
+      echo "                             defecto es 60."
+      echo
+      echo " -v variable:                Variable de la que queremos sacar su máximos y mínimos. Por defecto es presión."
+      echo
+      echo " -r:                         Se repite la ejecución anterior. No tendrá que volver a procersar los grids, tomando como base el "
+      echo "                             el último directorio temporal. Con esta opción activada solo se pueden modificar los parámetros "
+      echo "                             --press_minframes y --press_smooth."
+      echo
+      echo "--press_minframes nframes:   Número mínimo de frames consecutivos en los que debe aparecer una letra. Por defecto es la "
+      echo "                             la cuarta parte del número total de frames."
+      echo
       echo "--press_threshold threshold: Distancia mínima entre letras. Entre dos frames consecutivos dos letras serán consideradas "
-      echo "                  como la misma si su distancia es inferior. En un mismo frame será descartada una letra que esté a menos "
-      echo "                  de esta distancia. Por defecto se calcula autómaticamente en función del zoom de la proyección y los mínutos "
-      echo "                  de la interpolación."
-      echo "--press_resolution res: Resolución a la que se resamplea la presión. Con el fin de obtener isobaras más suavizadas se resamplea "
-      echo "                  el grid de presión a una resolución menor. Por defecto es 0.5."
-      echo "--press_smooth smooth: Factor de suavizado. Para obtener isobaras más suavizadas se aplica una mascacara de convolución de  "
-      echo "                  suavizado. Por defecto es 19."
-      echo "--pressexclude idsexclude: Si no queremos determinadas letras en la animación podemos excluirlas con esta opción. 'idexclude'"
-      echo "                  debe tener el formato 'id0/id1/.../idn' donde idx es el id de una de las letras que queremos excluir."
-      echo "--clean:          Borra todos los directorios temporales excepto los que están siendo utilizados por algún proceso. No se"
-      echo "                  puede utilizar junto a la opción -r."
-      echo " -o:              Sobreescribe todos los ficheros sin preguntar si existen."
-      echo " -h:              Muestra esta ayuda."
+      echo "                             como la misma si su distancia es inferior. En un mismo frame será descartada una letra que esté a menos "
+      echo "                             de esta distancia. Por defecto se calcula autómaticamente en función del zoom de la proyección y los mínutos "
+      echo "                             de la interpolación."
+      echo
+      echo "--press_resolution res:      Resolución a la que se resamplea la presión. Con el fin de obtener isobaras más suavizadas se resamplea "
+      echo "                             el grid de presión a una resolución menor. Por defecto es 0.5."
+      echo
+      echo "--press_smooth smooth:       Factor de suavizado. Para obtener isobaras más suavizadas se aplica una mascacara de convolución de  "
+      echo "                             suavizado. Por defecto es 19."
+      echo
+      echo "--pressexclude idsexclude:   Si no queremos determinadas letras en la animación podemos excluirlas con esta opción. 'idexclude'"
+      echo "                             debe tener el formato 'id0/id1/.../idn' donde idx es el id de una de las letras que queremos excluir."
+      echo
+      echo "--clean:                     Borra todos los directorios temporales excepto los que están siendo utilizados por algún proceso. No se"
+      echo "                             puede utilizar junto a la opción -r."
+      echo
+      echo " -o:                         Sobreescribe todos los ficheros sin preguntar si existen."
+      echo
+      echo " -h:                         Muestra esta ayuda."
       echo
       echo "El fichero default.cfg define las variables de configuración de este comando."
 
@@ -293,9 +308,9 @@ ultimoTMP=0
 CLEAN=0
 
 # Comprobación de que existe el software.
-command -v ${GMT} > /dev/null 2>&1 || { echo "error: ${GMT} no está instalado." >&2 && exit 1; }
-command -v ${CONVERT}  > /dev/null 2>&1 || { echo "error: ${CONVERT} no está instalado." >&2 && exit 1; }
-command -v ${COMPOSITE}  > /dev/null 2>&1 || { echo "error: ${COMPOSITE} no está instalado." >&2 && exit 1; }
+command -v ${GMT} > /dev/null 2>&1 || { echo "error: ${GMT} no está instalado." >&2; usage; exit 1; }
+command -v ${CONVERT}  > /dev/null 2>&1 || { echo "error: ${CONVERT} no está instalado." >&2; usage; exit 1; }
+command -v ${COMPOSITE}  > /dev/null 2>&1 || { echo "error: ${COMPOSITE} no está instalado." >&2; usage; exit 1; }
 
 
 parseOptions "$@"
@@ -321,8 +336,8 @@ source ${geogfile}
 
 
 # Chequeamos los archivos del fichero de configuración geográfica
-[ ! -z ${GLOBEFILE} ] && [ ! -f ${GLOBEFILE} ] && \
-    { echo "Error: No se ha encontrado el fichero ${GLOBEFILE}" >&2; usage; exit 1; }
+#[ ! -z ${GLOBEFILE} ] && [ ! -f ${GLOBEFILE} ] && \
+#    { echo "Error: No se ha encontrado el fichero ${GLOBEFILE}" >&2; usage; exit 1; }
 [ ! -f ${fondomar} ] && \
     { echo "Error: No se ha encontrado el fichero ${fondomar}" >&2; usage; exit 1; }
 [ ! -f ${fronterasPNG} ] && \

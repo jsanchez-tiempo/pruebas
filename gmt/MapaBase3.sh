@@ -425,7 +425,7 @@ if [ ! -z ${cod} ] && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.shp ] && [ ! -f ${DI
     && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.dpg ] && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.shx ] \
     && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.prj ]
 then
-    echo "error: No se han encontrado los archivos de límites geográficos gadm28_adm${i}.* ." >&2
+    echo "error: No se han encontrado los archivos de límites geográficos gadm28_adm${i}.* dentro del directorio ${DIRFRONTERAS}." >&2
     exit 1
 fi
 

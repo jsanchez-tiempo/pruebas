@@ -25,7 +25,7 @@ scriptName=`basename $0`
 # Función que define la ayuda sobre este script.
 function usage() {
 
-      tiposvideo=`ls ${CFGDIR} | awk 'NR>1{printf ",%s ",var}{"basename "$1" .cfg" |  getline var; }END{printf "y %s\n",var}' | sed 's/^,//'`
+      tiposvideo=`ls ${CFGDIR} | awk 'NR==2{printf "%s",var}NR>2{printf ", %s",var}{"basename "$1" .cfg" |  getline var; }END{printf " y %s\n",var}' | sed 's/^,//'`
       echo
       echo "Genera un vídeo con una animación basada en las variables de los grids."
       echo
@@ -37,64 +37,90 @@ function usage() {
       echo "                   [--show_vars] [--bottom_wind valor] [--presscfg filepress] [--labels filelabels] "
       echo "                   [--geoglabels]"
       echo
-      echo " tipo :           Tipo de vídeo que se va a generar. Se pueden configurar los tipos de vídeo en el directorio"
-      echo "                  ${CFGDIR}. Los tipos disponibles actualmente son:"
-      echo "                  ${tiposvideo}"
-      echo " fechainicio :    Fecha en la que comienza la animación del vídeo. En formato yyyyMMddhh (UTC)."
-      echo " fechafinal :     Fecha en la que finaliza la animación del vídeo. En formato yyyyMMddhh (UTC)."
-      echo " -f archivo:      Nombre del fichero de salida. Por defecto out.mkv"
-      echo " -t titulo:       Título que aparecerá en los rótulos del vídeo. Por defecto es el que viene configurado con"
-      echo "                  el tipo del vídeo."
-      echo " -d fechapasada:  Fecha de la pasada de la que se van a coger los grids de entrada. Por defecto se coge la"
-      echo "                  última pasada disponible que sea menor que la fecha de inicio. En formato yyyyMMddhh (UTC)."
-      echo " -g geogcfgfile:  Fichero de configuración geográfica. Se pueden generar con el script MapaBase3.sh."
-      echo "                  Por defecto spain3.cfg."
-      echo " -e stylecfgfile: Fichero de configuración de estilo. Configuración de los elementos que se van a mostrar en "
-      echo "                  en el vídeo. Por defecto meteored2.cfg"
-      echo " -v viento:       Indica si se van a mostrar las partículas del viento o no. Por defecto viene determinado por"
-      echo "                  la configuración de tipo. Puede ser 0 para deshabilitar y 1 para habilitarlo."
-      echo " -p presión:      Indica si se va a mostrar las isobaras y las letras de presión. Por defecto viene determinado por"
-      echo "                  la configuración de tipo. Puede ser 0 para deshabilitar y 1 para habilitarlo."
-      echo " -m minutos:      Minutos en los que se interpola un frame. Debe ser un divisor de 60. Un valor menor hace "
-      echo "                  que la animación haga una transición más suave pero la generación del vídeo será más lenta. Por "
-      echo "                  defecto viene determinado por la configuración de tipo."
-      echo " -s slowmotion:   Factor de ralentización de la animación. Debe ser un entero mayor o igual que 1. El valor 1 "
-      echo "                  no altera el número de frames generados en la animación, el valor 2 duplica el número de frames "
-      echo "                  generados y el valor n multiplica por n el número de frames. Por defecto viene determinado "
-      echo "                  por la configuración de tipo."
+      echo " tipo :                    Tipo de vídeo que se va a generar. Se pueden configurar los tipos de vídeo en el directorio"
+      echo "                           ${CFGDIR}. Los tipos disponibles actualmente son:"
+      echo "                           ${tiposvideo}"
+      echo
+      echo " fechainicio :             Fecha en la que comienza la animación del vídeo. En formato yyyyMMddhh (UTC)."
+      echo
+      echo " fechafinal :              Fecha en la que finaliza la animación del vídeo. En formato yyyyMMddhh (UTC)."
+      echo
+      echo " -f archivo:               Nombre del fichero de salida. Debe tener extensión .mp4 o .mkv. Por defecto out.mkv"
+      echo
+      echo " -t titulo:                Título que aparecerá en los rótulos del vídeo. Por defecto es el que viene configurado con"
+      echo "                           el tipo del vídeo."
+      echo
+      echo " -d fechapasada:           Fecha de la pasada de la que se van a coger los grids de entrada. Por defecto se coge la"
+      echo "                           última pasada disponible que sea menor que la fecha de inicio. En formato yyyyMMddhh (UTC)."
+      echo
+      echo " -g geogcfgfile:           Fichero de configuración geográfica. Se pueden generar con el script MapaBase3.sh."
+      echo "                           Por defecto spain3.cfg."
+      echo
+      echo " -e stylecfgfile:          Fichero de configuración de estilo. Configuración de los elementos que se van a mostrar en "
+      echo "                           en el vídeo. Por defecto meteored2.cfg"
+      echo
+      echo " -v viento:                Indica si se van a mostrar las partículas del viento o no. Por defecto viene determinado por"
+      echo "                           la configuración de tipo. Puede ser 0 para deshabilitar y 1 para habilitarlo."
+      echo
+      echo " -p presión:               Indica si se va a mostrar las isobaras y las letras de presión. Por defecto viene determinado por"
+      echo "                           la configuración de tipo. Puede ser 0 para deshabilitar y 1 para habilitarlo."
+      echo
+      echo " -m minutos:               Minutos en los que se interpola un frame. Debe ser un divisor de 60. Un valor menor hace "
+      echo "                           que la animación haga una transición más suave pero la generación del vídeo será más lenta. Por "
+      echo "                           defecto viene determinado por la configuración de tipo."
+      echo
+      echo " -s slowmotion:            Factor de ralentización de la animación. Debe ser un entero mayor o igual que 1. El valor 1 "
+      echo "                           no altera el número de frames generados en la animación, el valor 2 duplica el número de frames "
+      echo "                           generados y el valor n multiplica por n el número de frames. Por defecto viene determinado "
+      echo "                           por la configuración de tipo."
+      echo
       echo " --nstart_frames nsframes: Número de frames desde el comienzo hasta que empieza a moverse la animación. Debe ser "
-      echo "                  un número entero entre 1 y 60 y no menor que el valor 'fadein'. Por defecto viene determinado en "
-      echo "                  el fichero de configuración de estilo."
-      echo " --nend_frames neframes: Número de frames desde que termina la animación hasta que finaliza el vídeo. Debe ser "
-      echo "                  un número entero entre 0 y 60. Por defecto viene determinado es 10. "
-      echo " --nframes nframes: Número mínimo de frames en cada intervalo de 3 horas. Por defecto es slowmotion*180/minutos. Si  "
-      echo "                  se indica un valor mayor se detendrá la animación en la tercera hora hasta que se complete el "
-      echo "                  número de frames. Si se han activado las partículas de viento estas seguirán moviendose."
-      echo " --fadein fadein: Número de frames que va a durar el efecto de transición entre el mapa base vacio "
-      echo "                  y el mapa con variables. Debe ser un valor entre 0 y 60. Si se indica un valor de 0 las variables "
-      echo "                  aparecen pintadas desde el principio. Por defecto es 15."
-      echo " --border color:  Color de las fronteras del mapa: 'white' para fronteras de color blanco y 'black' para fronteras "
-      echo "                  de color negro. Por defecto viene determinado por la configuración de tipo."
-      echo " --transparency t:  Porcentaje de transparencia sobre las capas de variables. Por defecto es 0."
-      echo " --bottom_scale bs: Valor mínimo de la escala de colores. Para una variable los valores por debajo de este valor no se pintarán "
-      echo "                  (transparente). 'bs' tiene el formato 'V0/V1/.../Vn-1' donde 'n' es el número de variables que se van a pintar. "
-      echo "                  Vx representa el valor de la variable en la posición x. Por defecto viene determinado por la configuración"
-      echo "                  del tipo."
-      echo " --top_scale ts:  Valor máximo de la escala de colores. Para una variable los valores por encima de este valor no se pintarán "
-      echo "                  (transparente). 'ts' tiene el formato 'V0/V1/.../Vn-1' donde 'n' es el número de variables que se van a pintar. "
-      echo "                  Vx representa el valor de la variable en la posición x. Por defecto viene determinado por la configuración"
-      echo "                  del tipo."
-      echo " --show_vars:     Muestra las variables que se van a pintar ordenadas de abajo a arriba."
-      echo " --bottom_wind valor: Valor mínimo del viento. Por debajo de este valor no se pintarán las partículas del viento. Por defecto "
-      echo "                  viene determinado en la configuración del tipo."
-      echo " --presscfg filepress: Fichero de configuración de presión. Utilizará la configuración de presión especificada en el fichero. Se"
-      echo "                  puede generar con el script presslabels.sh."
-      echo " --labels filelabels: Fichero de trayectoria de etiquetas. Pintará las etiquetas definidas en este fichero. Se puede generar"
-      echo "                  generar con el script labels.sh."
-      echo " --geoglabels:    Indica si las coordenadas definidas en el fichero de etiquetas son geográficas. Si no se usa esta opción"
-      echo "                  se tomarán como cartesianas."
-      echo " -o:              Sobreescribe todos los ficheros sin preguntar si existen."
-      echo " -h:              Muestra esta ayuda."
+      echo "                           un número entero entre 1 y 60 y no menor que el valor 'fadein'. Por defecto viene determinado en "
+      echo "                           el fichero de configuración de estilo."
+      echo
+      echo " --nend_frames neframes:   Número de frames desde que termina la animación hasta que finaliza el vídeo. Debe ser "
+      echo "                           un número entero entre 0 y 60. Por defecto viene determinado es 10. "
+      echo
+      echo " --nframes nframes:        Número mínimo de frames en cada intervalo de 3 horas. Por defecto es slowmotion*180/minutos. Si  "
+      echo "                           se indica un valor mayor se detendrá la animación en la tercera hora hasta que se complete el "
+      echo "                           número de frames. Si se han activado las partículas de viento estas seguirán moviendose."
+      echo
+      echo " --fadein fadein:          Número de frames que va a durar el efecto de transición entre el mapa base vacio "
+      echo "                           y el mapa con variables. Debe ser un valor entre 0 y 60. Si se indica un valor de 0 las variables "
+      echo "                           aparecen pintadas desde el principio. Por defecto es 15."
+      echo
+      echo " --border color:           Color de las fronteras del mapa: 'white' para fronteras de color blanco y 'black' para fronteras "
+      echo "                           de color negro. Por defecto viene determinado por la configuración de tipo."
+      echo
+      echo " --transparency t:         Porcentaje de transparencia sobre las capas de variables. Por defecto es 0."
+      echo
+      echo " --bottom_scale bs:        Valor mínimo de la escala de colores. Para una variable los valores por debajo de este valor no se pintarán "
+      echo "                           (transparente). 'bs' tiene el formato 'V0/V1/.../Vn-1' donde 'n' es el número de variables que se van a pintar. "
+      echo "                           Vx representa el valor de la variable en la posición x. Por defecto viene determinado por la configuración"
+      echo "                           del tipo."
+      echo
+      echo " --top_scale ts:           Valor máximo de la escala de colores. Para una variable los valores por encima de este valor no se pintarán "
+      echo "                           (transparente). 'ts' tiene el formato 'V0/V1/.../Vn-1' donde 'n' es el número de variables que se van a pintar. "
+      echo "                           Vx representa el valor de la variable en la posición x. Por defecto viene determinado por la configuración"
+      echo "                           del tipo."
+      echo
+      echo " --show_vars:              Muestra las variables que se van a pintar ordenadas de abajo a arriba."
+      echo
+      echo " --bottom_wind valor:      Valor mínimo del viento. Por debajo de este valor no se pintarán las partículas del viento. Por defecto "
+      echo "                           viene determinado en la configuración del tipo."
+      echo
+      echo " --presscfg filepress:     Fichero de configuración de presión. Utilizará la configuración de presión especificada en el fichero. Se"
+      echo "                           puede generar con el script presslabels.sh."
+      echo
+      echo " --labels filelabels:      Fichero de trayectoria de etiquetas. Pintará las etiquetas definidas en este fichero. Se puede generar"
+      echo "                           generar con el script labels.sh."
+      echo
+      echo " --geoglabels:             Indica si las coordenadas definidas en el fichero de etiquetas son geográficas. Si no se usa esta opción"
+      echo "                           se tomarán como cartesianas."
+      echo
+      echo " -o:                       Sobreescribe todos los ficheros sin preguntar si existen."
+      echo
+      echo " -h:                       Muestra esta ayuda."
       echo
       echo "El fichero default.cfg define las variables de configuración de este comando."
 
@@ -402,12 +428,12 @@ pintarEtiquetas=0
 geoglabels=0
 
 # Comprobación de que existe el software.
-command -v ${GMT} > /dev/null 2>&1 || { echo "error: ${GMT} no está instalado." >&2 && exit 1; }
-command -v ${CONVERT}  > /dev/null 2>&1 || { echo "error: ${CONVERT} no está instalado." >&2 && exit 1; }
-command -v ${COMPOSITE}  > /dev/null 2>&1 || { echo "error: ${COMPOSITE} no está instalado." >&2 && exit 1; }
-command -v ${FFMPEG}  > /dev/null 2>&1 || { echo "error: ${FFMPEG} no está instalado." >&2 && exit 1; }
-command -v ${OGR2OGR}  > /dev/null 2>&1 || { echo "error: ${OGR2OGR} no está instalado." >&2 && exit 1; }
-command -v ${CDO}  > /dev/null 2>&1 || { echo "error: ${CDO} no está instalado." >&2 && exit 1; }
+command -v ${GMT} > /dev/null 2>&1 || { echo "error: ${GMT} no está instalado." >&2; usage; exit 1; }
+command -v ${CONVERT}  > /dev/null 2>&1 || { echo "error: ${CONVERT} no está instalado." >&2 ; usage; exit 1; }
+command -v ${COMPOSITE}  > /dev/null 2>&1 || { echo "error: ${COMPOSITE} no está instalado." >&2; usage; exit 1; }
+command -v ${FFMPEG}  > /dev/null 2>&1 || { echo "error: ${FFMPEG} no está instalado." >&2 ; usage; exit 1; }
+command -v ${OGR2OGR}  > /dev/null 2>&1 || { echo "error: ${OGR2OGR} no está instalado." >&2; usage; exit 1; }
+command -v ${CDO}  > /dev/null 2>&1 || { echo "error: ${CDO} no está instalado." >&2 ; usage; exit 1; }
 
 parseOptions "$@"
 
@@ -416,6 +442,12 @@ if ! [[ ${outputFile} == /* ]]
 then
     outputFile=`realpath ${dirprev}/${outputFile}`
 fi
+
+# Chequeamos que el fichero de salida tiene una extensión válida
+extension=`basename ${outputFile} | sed -n 's/^.*\.\(.*\)$/\1/p'`
+[ ${extension,,} != "mkv" ] && [ ${extension,,} != "mp4" ] &&
+    { echo "Error: El fichero de salida `basename ${outputFile}` no tiene una extensión válida." >&2; usage; exit 1; }
+
 
 checkDIRS
 
@@ -446,9 +478,9 @@ fi
 
 # Comprobamos que existen las fuentes del titulo y subtitulo
 [ `${CONVERT} -list font | sed -n '/^[[:space:]]*Font:[[:space:]]*'${fuentetitulo}'$/Ip' | wc -l` -eq 0 ] &&\
-    { echo "Error: No se ha encontrado la fuente ${fuentetitulo}" >&2; usage; exit 1; }
+    { echo "Error: No se ha encontrado la fuente ${fuentetitulo}. Se puede cambiar la fuente modificando el fichero de estilo en ${DIRESTILOS}." >&2; usage; exit 1; }
 [ `${CONVERT} -list font | sed -n '/^[[:space:]]*Font:[[:space:]]*'${fuentesubtitulo}'$/Ip' | wc -l` -eq 0 ] &&\
-    { echo "Error: No se ha encontrado la fuente ${fuentesubtitulo}" >&2; usage; exit 1; }
+    { echo "Error: No se ha encontrado la fuente ${fuentesubtitulo}. Se puede cambiar la fuente modificando el fichero de estilo en ${DIRESTILOS}." >&2; usage; exit 1; }
 
 # Comprobamos que existen los logos
 for((nlogo=0; nlogo<${nlogos}; nlogo++))
@@ -479,8 +511,9 @@ if [ ! -z ${cod} ] && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.shp ] && [ ! -f ${DI
     && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.dpg ] && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.shx ] \
     && [ ! -f ${DIRFRONTERAS}/gadm28_adm${i}.prj ]
 then
-    echo "error: No se han encontrado los archivos de límites geográficos gadm28_adm${i}.* ." >&2
-    exit 1
+    echo "error: No se han encontrado los archivos de límites geográficos gadm28_adm${i}.* dentro del directorio ${DIRFRONTERAS}." >&2;
+    usage;
+    exit 1;
 fi
 
 
@@ -510,7 +543,7 @@ fechapasada="`find ${DIRNETCDF}/ -maxdepth 1 -mindepth 1 -type d | awk '{system(
 
 # Si no se encuentra ningun directorio de pasada
 [ ${fechapasada} == "00" ] && \
-    { echo "Error: No se ha encontrado ningún directorio de pasada en ${DIRNETCDF}" >&2; usage; exit 1; }
+    { echo "Error: No se ha encontrado ningún directorio de pasada compatible con la fecha ${min} en ${DIRNETCDF}" >&2; usage; exit 1; }
 
 # Si el directorio de pasada pasa el patrón de 10 digitos pero no es una fecha válida
 date -d "${fechapasada:0:8} ${fechapasada:8:2}" > /dev/null 2>&1 || \
@@ -1593,4 +1626,4 @@ ${FFMPEG} -y -f image2 -i ${fondoPNG} ${framesViento} ${escalas} -f image2 -i ${
 
 printMessage "¡Se ha generado el vídeo `basename ${outputFile}` con exito!"
 
-rm -rf ${dir}
+rm -rf ${TMPDIR}

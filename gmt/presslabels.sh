@@ -244,6 +244,9 @@ function parseOptions() {
 }
 
 
+# Directorio donde se llama al script
+dirprev=${PWD}
+
 cd `dirname $0`
 
 # Cargamos las variables por defecto, las funciones y la configuración de las variables de los grids
@@ -296,6 +299,12 @@ command -v ${COMPOSITE}  > /dev/null 2>&1 || { echo "error: ${COMPOSITE} no est�
 
 
 parseOptions "$@"
+
+# Si la ruta no es absoluta debe generarse el fichero de salida donde se ejecuto el script
+if ! [[ ${outputFile} == /* ]]
+then
+    outputFile=`realpath ${dirprev}/${outputFile}`
+fi
 
 # Chequeamos que existen los directorios
 checkDIRS
@@ -517,7 +526,7 @@ then
 
     # Usamos la J y R cartesianas
     J="-JX${xlength}c/${ylength}c"
-    R=`grdinfo  ${TMPDIR}/${min}_${variable}.nc -Ir -C` ####
+    R=`${GMT} grdinfo  ${TMPDIR}/${min}_${variable}.nc -Ir -C` ####
 
     #Redifinimos la función pintarVariable
     function pintarVariable {

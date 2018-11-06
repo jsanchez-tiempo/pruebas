@@ -307,6 +307,8 @@ function parseOptions() {
     done
 }
 
+# Directorio donde se llama al script
+dirprev=${PWD}
 
 cd `dirname $0`
 
@@ -409,6 +411,12 @@ command -v ${CDO}  > /dev/null 2>&1 || { echo "error: ${CDO} no está instalado.
 
 parseOptions "$@"
 
+# Si la ruta no es absoluta debe generarse el fichero de salida donde se ejecuto el script
+if ! [[ ${outputFile} == /* ]]
+then
+    outputFile=`realpath ${dirprev}/${outputFile}`
+fi
+
 checkDIRS
 
 # Si no se ha pasado archivo de conf geográfico o de estilo por parámetro se cogen estos por defecto
@@ -450,8 +458,8 @@ do
 done
 
 # Chequeamos los archivos del fichero de configuración geográfica
-[ ! -z ${GLOBEFILE} ] && [ ! -f ${GLOBEFILE} ] && \
-    { echo "Error: No se ha encontrado el fichero ${GLOBEFILE}" >&2; usage; exit 1; }
+#[ ! -z ${GLOBEFILE} ] && [ ! -f ${GLOBEFILE} ] && \
+#    { echo "Error: No se ha encontrado el fichero ${GLOBEFILE}" >&2; usage; exit 1; }
 [ ! -f ${fondomar} ] && \
     { echo "Error: No se ha encontrado el fichero ${fondomar}" >&2; usage; exit 1; }
 [ ! -f ${fronterasPNG} ] && \
@@ -817,7 +825,7 @@ then
 
         # Usamos las J y R cartesianas
         J="-JX${xlength}c/${ylength}c"
-        R=`grdinfo ${dataFileDST} -Ir -C` ####
+        R=`${GMT} grdinfo ${dataFileDST} -Ir -C` ####
 
 
         stepinterp=3
@@ -919,7 +927,7 @@ then
 
     # Usamos la J y R cartesianas
     J="-JX${xlength}c/${ylength}c"
-    R=`grdinfo ${dataFileDST} -Ir -C` ####
+    R=`${GMT} grdinfo ${dataFileDST} -Ir -C` ####
 
     #Redifinimos la función pintarVariable
     function pintarVariable {
@@ -1014,7 +1022,7 @@ then
 
     # Usamos la J y R cartesianas
     J="-JX${xlength}c/${ylength}c"
-    R=`grdinfo ${dataFileDST} -Ir -C` ####
+    R=`${GMT} grdinfo ${dataFileDST} -Ir -C` ####
 
 
     fecha=${min}
@@ -1422,7 +1430,7 @@ then
         }
         procesarGrids ${variablefinal} ${max} ${max} ${fechapasada}
         J="-JX${xlength}c/${ylength}c"
-        R=`grdinfo ${dataFileDST} -Ir -C` ####
+        R=`${GMT} grdinfo ${dataFileDST} -Ir -C` ####
     fi
 
     # Se calculan las anotaciones en el fichero Tlabels.txt con la función definida en el fichero de configuración del tipo

@@ -443,6 +443,16 @@ then
     outputFile=`realpath ${dirprev}/${outputFile}`
 fi
 
+if ! [[ ${presscfgfile} == /* ]]
+then
+    presscfgfile=`realpath ${dirprev}/${presscfgfile}`
+fi
+
+if ! [[ ${labelsfile} == /* ]]
+then
+    labelsfile=`realpath ${dirprev}/${labelsfile}`
+fi
+
 # Chequeamos que el fichero de salida tiene una extensión válida
 extension=`basename ${outputFile} | sed -n 's/^.*\.\(.*\)$/\1/p'`
 [ ${extension,,} != "mkv" ] && [ ${extension,,} != "mp4" ] &&

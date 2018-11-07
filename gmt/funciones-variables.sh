@@ -1,8 +1,21 @@
 #!/bin/bash
 
+###############################################################################
+# Definición de funciones de procesar, de pintar y otras relacionadas
+# con las variables.
+#
+#
+# Juan Sánchez Segura <jsanchez.tiempo@gmail.com>
+# Marcos Molina Cano <marcosmolina.tiempo@gmail.com>
+# Guillermo Ballester Valor <gbvalor@gmail.com>                      07/11/2018
+###############################################################################
 
+
+# Función que carga los parámetros asociados a una variable
+# Parámetros:
+#   $1: Nombre de la variable
 function cargarVariable {
-    var=$1
+    local var=$1
 
 
     funcionesprocesar=${variables[${var},fprocesar]}
@@ -29,61 +42,40 @@ function cargarVariable {
 
 }
 
-
+# Función que procesa el grid de gh500
 function procesarGH500 {
 
     ${CDO} -sellevel,500 -selvar,gh ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${dataFileDST}
-
-
-
     ${GMT} grdconvert -Rd ${dataFileDST}\?gh ${dataFileDST} 2>> ${errorsFile}
     ${GMT} grdmath ${Rgeog} ${dataFileDST} 9.81 DIV 10 DIV = ${dataFileDST} 2>> ${errorsFile}
 
 #    ${GMT} grdsample -I0.5 ${dataFileDST}  -G${dataFileDST}
-
 }
 
-
+# Función que pinta el grid de gh500
+# Parámetros:
+#   $1: Nombre del fichero que se pinta
 function pintarGH500 {
 
     dataFile=$1
 
     ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb9 -Nr
-
     [ ! -z ${dpi} ] && E="-E${dpi}"
     ${GMT} grdimage ${TMPDIR}/kk  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile}
-
-##    gmt grdcontour ${dataFile} -S500 -J -R  -W1p,gray25 -A+552+f8p -K -O >> ${tmpFile}
-#    ${GMT} grdcontour ${TMPDIR}/kk  -S500 ${J} ${R} -W1p,gray25 -C+552 -K -O >> ${tmpFile}
-
-
 }
 
+
+# Función que procesa el grid de t500
 function procesarT500 {
     ${CDO} -sellevel,500 -selvar,t ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${errorsFile}
-
     ${GMT} grdconvert -Rd ${dataFileDST}\?t ${dataFileDST} 2>> ${errorsFile}
     ${GMT} grdmath ${Rgeog} ${dataFileDST} 273.15 SUB = ${dataFileDST} 2>> ${errorsFile}
 
 }
 
-function procesarT850 {
-    ${CDO} -sellevel,850 -selvar,t ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${errorsFile}
-
-    ${GMT} grdconvert -Rd ${dataFileDST}\?t ${dataFileDST} 2>> ${errorsFile}
-    ${GMT} grdmath ${Rgeog} ${dataFileDST} 273.15 SUB = ${dataFileDST} 2>> ${errorsFile}
-
-
-}
-
-
-function pintarT850 {
-    dataFile=$1
-
-    [ ! -z ${dpi} ] && E="-E${dpi}"
-    ${GMT} grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile} #-t70
-}
-
+# Función que pinta el grid de t500
+# Parámetros:
+#   $1: Nombre del fichero que se pinta
 function pintarT500 {
     dataFile=$1
 
@@ -91,9 +83,25 @@ function pintarT500 {
     ${GMT} grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile} #-t70
 }
 
+# Función que procesa el grid de t850
+function procesarT850 {
+    ${CDO} -sellevel,850 -selvar,t ${TMPDIR}/${fecha}.nc ${dataFileDST} 2>> ${errorsFile}
+    ${GMT} grdconvert -Rd ${dataFileDST}\?t ${dataFileDST} 2>> ${errorsFile}
+    ${GMT} grdmath ${Rgeog} ${dataFileDST} 273.15 SUB = ${dataFileDST} 2>> ${errorsFile}
+}
+
+# Función que pinta el grid de t850
+# Parámetros:
+#   $1: Nombre del fichero que se pinta
+function pintarT850 {
+    dataFile=$1
+
+    [ ! -z ${dpi} ] && E="-E${dpi}"
+    ${GMT} grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile} #-t70
+}
 
 
-
+# Función que procesa el grid del módulo de viento en superfice medio
 function procesarViento {
         ${GMT} grdmath  ${TMPDIR}/${fecha}.nc\?u10 SQR ${TMPDIR}/${fecha}.nc\?v10 SQR ADD SQRT 3.6 MUL = ${dataFileDST}
         ${GMT} grdconvert -Rd ${dataFileDST} ${dataFileDST}
@@ -101,6 +109,7 @@ function procesarViento {
 
 }
 
+# Función que procesa el grid del módulo de viento medio a 300hpa
 function procesarViento300 {
 
         dataFileU=${TMPDIR}/${fecha}_u300.nc
@@ -114,6 +123,7 @@ function procesarViento300 {
 
 }
 
+# Función que procesa el grid de rachas de viento
 function procesarRachasViento {
         fechasig=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
         ${GMT} grdmath  ${TMPDIR}/${fechasig}.nc\?fg310 3.6 MUL = ${dataFileDST}
@@ -123,7 +133,9 @@ function procesarRachasViento {
 }
 
 
-
+# Función que pinta el grid de viento en superficie
+# Parámetros:
+#   $1: Nombre del fichero que se pinta
 function pintarViento {
 
     dataFile=$1
@@ -131,6 +143,9 @@ function pintarViento {
 
 }
 
+# Función que pinta el grid de viento a 300hpa
+# Parámetros:
+#   $1: Nombre del fichero que se pinta
 function pintarViento300 {
 
     dataFile=$1
@@ -142,34 +157,16 @@ function pintarViento300 {
 
 ###### PRESIÓN #######
 
+# Función que pinta el grid de presión a nivel del mar y calcula los máximos y mínimos
+# Parámetros:
+#   $1: Nombre del fichero que se pinta
 function pintarPresion {
 
     dataFile=$1
-#    color="white"
-#        color="gray35"
-#    disobaras=2
-#    detiquetas=4
 
 
-
-
-
-
-    # Pintar las isobaras de presión
-#    ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb19
     ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb${pressmooth} -Nr
-
-#    echo ${colorisobaras}
-#    colorisobaras="white"
     ${GMT} grdcontour ${TMPDIR}/kk -Q200 -S100 ${J} ${R} -W1p,white -C${disobaras} -W${colorisobaras} -K -O >> ${tmpFile}
-
-#    disobaras=1
-#    detiquetas=5
-
-    # Pintar los puntos de alta presión
-#    gmt grdcontour ${dataFile} -V -J -R -A8+t"contourlabels.txt" -T++a+d20p/1p+lLH -Q100 -Gn1/2c -C8 -K -O > /dev/null
-#    gmt grdcontour ${TMPDIR}/kk -J -R -A${detiquetas}+t"${TMPDIR}/contourlabels.txt" -T++a+d20p/1p+lLH  -Gn1/2c -C${disobaras} -K -O > /dev/null
-#    awk '{if ($4!="H" && $4!="L") print $1,$2,$4}' ${TMPDIR}/contourlabels.txt |  gmt pstext -J -R -F+f8p,Helvetica-Bold,black+a0  -G${color}  -K -O >> ${tmpFile}
 
     if [ -z ${calcularMaxMinPress} ] || [ ${calcularMaxMinPress} -eq 1 ]
     then
@@ -180,7 +177,6 @@ function pintarPresion {
 
         ${GMT} grd2xyz -s ${TMPDIR}/kk2 | awk '{printf "%s %s %d\n",$1,$2,int($3*100+0.5)}' | sort -k3 -n -r |\
          awk -v umbral=${dminletras} -f awk/filtrarpresionmaxmin.awk | awk -v min=${hmsl} -v fecha=${fecha} '{press=$3/100; if (press>=min) printf "%s %s %s %d A\n",fecha,$1,$2,press}' >> ${TMPDIR}/maxmins.txt
-    #    echo ${dminletras}
         ${GMT} grdmath ${TMPDIR}/kk DUP EXTREMA -2 EQ MUL = ${TMPDIR}/kk2
         ${GMT} grdfilter ${TMPDIR}/kk2 -G${TMPDIR}/kk2 -Dp -Ffmconv.nc -Np
         ${GMT} grdmath  ${TMPDIR}/kk2 0 NAN = ${TMPDIR}/kk2
@@ -190,13 +186,13 @@ function pintarPresion {
     fi
 }
 
-
+# Función que calcula los máximos y mínimos de un grid
+# Parámetros:
+#   $1: grid del que se calculan lo máximos y mínimos
 function generarMaxMinPresion {
 
     dataFile=$1
 
-    # Pintar las isobaras de presión
-#    ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb19
     ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb${pressmooth} -Nr
 
 
@@ -207,7 +203,6 @@ function generarMaxMinPresion {
 
     ${GMT} grd2xyz -s ${TMPDIR}/kk2 | awk '{printf "%s %s %d\n",$1,$2,int($3*100+0.5)}' | sort -k3 -n -r |\
      awk -v umbral=${dminletras} -f awk/filtrarpresionmaxmin.awk | awk -v min=${hmsl} -v fecha=${fecha} '{press=$3/100; if (press>=min) printf "%s %s %s %d A\n",fecha,$1,$2,press}' >> ${TMPDIR}/maxmins.txt
-#     echo ${dminletras}
     ${GMT} grdmath ${TMPDIR}/kk DUP EXTREMA -2 EQ MUL = ${TMPDIR}/kk2
     ${GMT} grdfilter ${TMPDIR}/kk2 -G${TMPDIR}/kk2 -Dp -Ffmconv.nc -Np
     ${GMT} grdmath  ${TMPDIR}/kk2 0 NAN = ${TMPDIR}/kk2
@@ -218,7 +213,8 @@ function generarMaxMinPresion {
 }
 
 
-# Pinta los máximos y mínimos de presión en un mapa global
+# Función que pinta los máximos y mínimos de presión en un mapa global aplicandole
+# una transformación en perspectiva
 function pintarPresionAyBGlobal {
 
     w=`echo ${JGEOG} | sed -n 's/\-JG.*\/\(.*\)c/\1/p'`
@@ -236,8 +232,6 @@ function pintarPresionAyBGlobal {
       else\
         bottom=top;\
       printf "-R%.4f/%.4f/%.4f/%.4f\n",-left,w+right,-bottom,w+top}'`
-#    echo $RAMP
-#    echo $RTemp
 
 
     local ylengthtemp=`echo ${RTemp} | sed 's/-R//' | awk -F "/" '{printf "%.4f",$4-$3}'`
@@ -250,15 +244,12 @@ function pintarPresionAyBGlobal {
      -v xlengthnuevo=${xlengthtemp} -v ylengthnuevo=${ylengthtemp} \
      'BEGIN{mul=w/xlength; print xsizeicono/xsize*w*mul*xlength/xlengthnuevo, ysizeicono/ysize*ylength*mul^2*xsize/ysize*ylength/ylengthnuevo}')
 
-#     echo ${xlengthicono} ${ylengthicono}
 
 
     read dlon dlat < <(awk -v dlon=${xlengthicono} -v dlat=${ylengthicono} -v w=${w} 'BEGIN{dlon=dlon/2; dlat=dlat/2; print w/2+dlon,w/2+dlat;}'\
      | ${GMT} mapproject ${RTemp} -JX${w}c/${w}c -I | ${GMT} mapproject -Rd -JG0/0/${w} -I)
 
 
-#    echo ${dlat} ${dlon}
-#    nicono=0
     # Creamos una imagen vacia transparente de tamaño fullhd
     ${CONVERT} -size ${xsize}x${ysize} xc:transparent png32:${tmpFile}
     while read line
@@ -296,14 +287,10 @@ function pintarPresionAyBGlobal {
                 printf "\n";}'  |\
          awk -v xsize=${xsizeicono} -v ysize=${ysizeicono} '{printf "%s %s 0,%d,%s 0,0,%s %d,0,%s %d,%d,%s\n",$1,$2,ysize,$3,$4,xsize,$5,xsize,ysize,$6}'`
 
-#         echo ${line}
-# 	     echo ${coordenadas}
-##         exit
 
         local fade=`echo ${line} | awk '{print $5}'`
         local letra=`echo ${line} | awk '{print $4}'`
         local color=`awk -v letra=${letra} 'BEGIN{print (letra=="A")?"blue":"red"}'`
-#        local color=`awk -v letra=${letra} 'BEGIN{print (letra=="A")?"rgb(0,255,255)":"rgb(247,62,56)"}'`
         local presion=`echo ${line} | awk '{print $3}'`
 
         local x=`echo ${coordenadas} | awk '{print $1}'`
@@ -312,7 +299,6 @@ function pintarPresionAyBGlobal {
 
         read xsizetemp ysizetemp < <(echo ${transformacion} | tr " " "\n" | awk -F "," -v xsize=${xsizeicono} -v ysize=${ysizeicono} \
         '{xsize=($3>xsize)?$3:xsize; ysize=($4>ysize)?$4:ysize;} END {print xsize,ysize}')
-#        echo ${xsizetemp} ${ysizetemp}
 
         #Realizamos la transformación geométrica y colocamos la letra en su posición
         ${CONVERT} -size ${xsizetemp}x${ysizetemp} xc:none -font Roboto-Bold -pointsize 75 -fill "${color}" -gravity center -annotate +0+25 "${letra}" \
@@ -321,9 +307,6 @@ function pintarPresionAyBGlobal {
            \( +clone -background none -shadow 70x1-${dpx}+${dpy} \) +swap -flatten -channel a -evaluate multiply ${fade} miff:- |\
          ${COMPOSITE} -geometry +${x}+$((${y})) - ${tmpFile} png32:${tmpFile}
 
-#        echo $nicono
-#         cp ${tmpFile} ${TMPDIR}/${nicono}.png
-#         nicono=$(($nicono + 1))
 
     done <  ${TMPDIR}/contourlabels.txt
 
@@ -332,7 +315,7 @@ function pintarPresionAyBGlobal {
 }
 
 
-# Pinta las etiquetas
+# Función que pinta las etiquetas con textos en un mapa global aplicandole una transformación en perspectiva
 function pintarEtiquetasGlobal {
 
     w=`echo ${JGEOG} | sed -n 's/\-JG.*\/\(.*\)c/\1/p'`
@@ -409,12 +392,6 @@ function pintarEtiquetasGlobal {
          awk -v xsize=${xsizelabel} -v ysize=${ysizelabel} '{printf "%s %s 0,%d,%s 0,0,%s %d,0,%s %d,%d,%s\n",$1,$2,ysize,$3,$4,xsize,$5,xsize,ysize,$6}'`
 
 
-
-#        #Calculamos la posición donde colocar el icono
-#        read x y < <(echo ${line} | awk -F ";" -v xsizeicono=${xsizelabel} -v ysizeicono=${ysizelabel} \
-#         -v w=${xlength} -v h=${ylength} -v xsize=${xsize} -v ysize=${ysize} \
-#          '{printf "%d %d\n",$2*xsize/w-xsizeicono/2,ysize-$3*ysize/h-ysizeicono/2}')
-
         local label=`echo ${line} | awk -F ";" '{print $4}'`
         local fontsize=`echo ${line} | awk -F ";" '{print $5}'`
         local color=`echo ${line} | awk -F ";" '{print $6}'`
@@ -431,14 +408,7 @@ function pintarEtiquetasGlobal {
         '{xsize=($3>xsize)?$3:xsize; ysize=($4>ysize)?$4:ysize;} END {print xsize,ysize}')
 
 
-
-#        #Colocamos el icono dentro de la imagen principal
-#        ${CONVERT} -size ${xsizelabel}x${ysizelabel} xc:${bgcolor} -font Roboto-Bold \
-#          -pointsize ${fontsize} -fill "${color}" -gravity center -annotate +0+0 "${label}" \
-#           \( +clone -background none -shadow 70x1-1+1 \) +swap -flatten -channel a -evaluate multiply ${fade} miff:- |\
-#           ${COMPOSITE} -geometry +$((${x}+${dx}))+$((${y}+${dy})) - ${tmpFile} png32:${tmpFile}
-
-                #Realizamos la transformación geométrica y colocamos la letra en su posición
+        #Realizamos la transformación geométrica y colocamos la letra en su posición
         ${CONVERT} -size ${xsizetemp}x${ysizetemp} xc:${bgcolor} -font Roboto-Bold \
         -pointsize ${fontsize} -fill "${color}" -gravity center -annotate +0+0 "${label}" \
           -matte -virtual-pixel transparent -mattecolor none -distort Perspective "${transformacion}"\
@@ -450,7 +420,7 @@ function pintarEtiquetasGlobal {
 }
 
 
-# Pinta los máximos y mínimos de presión
+# Función que pinta los máximos y mínimos de presión en un mapa normal
 function pintarPresionAyBNormal {
 
 
@@ -479,18 +449,14 @@ function pintarPresionAyBNormal {
 
 }
 
-
+# Función que pinta los máximos y mínimos de presión. Por defecto es normal
 function pintarPresionAyB {
     pintarPresionAyBNormal
 }
 
 
-# Pinta las etiquetas
+# Función que pinta las etiquetas con textos en un mapa normal
 function pintarEtiquetasNormal {
-
-#    xsizelabel=150
-#    ysizelabel=50
-
 
     # Creamos una imagen vacia transparente de tamaño fullhd
     ${CONVERT} -size ${xsize}x${ysize} xc:transparent png32:${tmpFile}
@@ -525,14 +491,14 @@ function pintarEtiquetasNormal {
 
 
 
-
+# Función que pinta las etiquetas con textos. Por defecto es normal
 function pintarEtiquetas {
     pintarEtiquetasNormal
 }
 
 
 
-
+# Función que procesa el grid de presión a nivel del mar
 function procesarPresion {
         ${GMT} grdmath ${TMPDIR}/${fecha}.nc\?msl 100 DIV = ${dataFileDST}
         ${GMT} grdconvert -Rd ${dataFileDST} ${dataFileDST}
@@ -540,7 +506,7 @@ function procesarPresion {
 }
 
 
-
+# Función que procesa el grid de cobertura nubosa
 function procesarNubes {
 
     ${GMT} grdconvert -Rd ${TMPDIR}/${fecha}.nc\?tcc ${dataFileDST} 2>> ${errorsFile}
@@ -548,6 +514,9 @@ function procesarNubes {
 
 }
 
+# Función que pinta el grid de cobertura nubosa
+# Parámetros:
+#   $1: Nombre del fichero que se pinta
 function pintarNubes {
 
     dataFile=$1
@@ -556,15 +525,16 @@ function pintarNubes {
 
 }
 
+
+
 ######### PRECIPITACIÓN
 
+# Función que procesa el grid de precipitación acumulada
+# Parámetros:
+#   $1: listado de variables de precipitación acumulada
 function procesarPREC {
 
-#    variables="cp lsp"
-
     variables=$1
-#    echo ${variables}
-#    dataFileDST=`dirname ${ncFile}`/`basename ${ncFile} .nc`_acumprec.nc
 
     for variable in ${variables}
     do
@@ -592,18 +562,14 @@ function procesarPREC {
     fi
     ${GMT} grdmath ${dataFileDST} ${dataFileMin} SUB = ${dataFileDST}
 
-
-
 }
 
-
+# Función que procesa el grid de tasa de precipitación
+# Parámetros:
+#   $1: listado de variables de tasa de precipitación
 function procesarTasaPREC {
 
-
-#    variables="crr lsrr csfr lssfr"
     variables=$1
-#    echo ${variables}
-#    dataFileDST=`dirname ${ncFile}`/`basename ${ncFile} .nc`_acumprec.nc
 
     for variable in ${variables}
     do
@@ -628,26 +594,33 @@ function procesarTasaPREC {
 
 }
 
+# Función que procesa el grid de nieve
 function procesarNieve {
     variables="sf"
     procesarPREC "${variables}"
 }
 
+# Función que procesa el grid de tasa de nieve
 function procesarTasaNieve {
     variables="csfr lssfr"
     procesarTasaPREC "${variables}"
 }
 
+# Función que procesa el grid de lluvia
 function procesarLluvia {
     variables="cp lsp"
     procesarPREC "${variables}"
 }
 
+# Función que procesa el grid de tasa de lluvia
 function procesarTasaLluvia {
     variables="crr lsrr csfr lssfr"
     procesarTasaPREC "${variables}"
 }
 
+# Función que pinta el grid de tasa de precipitación
+# Parámetros:
+#   $1: Nombre del fichero que se pinta
 function pintarPREC {
 
     dataFile=$1
@@ -655,7 +628,6 @@ function pintarPREC {
     ${GMT} makecpt -C${cptGMT} -Fr | awk -v umbral=${umbralPREC} '$1>=umbral{print $0}' > ${TMPDIR}/kk.cpt
 
     tcolor=`sed -n '/^B/p' ${TMPDIR}/kk.cpt | tr "/" "," | awk '{printf "rgb(%s)",$2}'`
-
 
     [ ! -z ${dpi} ] && E="-E${dpi}"
     ${GMT} grdimage ${dataFile} -Qg4 ${E} ${J} ${R} -C${TMPDIR}/kk.cpt -nc+c -K -O >> ${tmpFile}

@@ -1,35 +1,26 @@
 #!/bin/bash
 
-
-function RGeogold {
-
-    proy=`echo ${J} | sed -n 's/\-J\(.\).*/\1/p'`
-    if [ ${R} != "-Rd" ] && ( [ ${proy} == "G" ] || [ ${proy} == "S" ] )
-    then
-        #Ampliamos R para que al pintar el mapa de la variable no se vea recortado por la proyección geográfica
-        w=`${GMT} mapproject ${J} ${R} -W | awk '{printf "%f",$1}'`
-        h=`${GMT} mapproject ${J} ${R} -W | awk '{printf "%f",$2}'`
-        lonmin=`echo 0 ${h} | ${GMT} mapproject -J -R -I | awk '{printf "%.1f",$1}'`
-        lonmed=`echo ${J} | sed -n 's/\-J[GSQ]\(.*\)c/\1/p' | awk -F "/" '{printf "%.1f",$3/2}'`
-        latmax=`echo ${lonmed} ${h} | ${GMT} mapproject -J -R -I | awk '{printf "%.1f",$2+0.5}'`
-
-        latmin1=`echo 0 0 | ${GMT} mapproject -J -R -I | awk '{printf "%.1f",$2-0.5}'`
-        latmin2=`echo ${w} 0 | ${GMT} mapproject -J -R -I | awk '{printf "%.1f",$2-0.5}'`
-        latmin=`awk -v latmin1=${latmin1} -v latmin2=${latmin2} 'BEGIN{print latmin1<latmin2?latmin1:latmin2}'`
-
-        Rgeog=`echo ${R} | sed -n 's/\-R\(.*\)+r/\1/p' | awk -F "/" -v lonmin=${lonmin} -v latmax=${latmax} -v latmin=${latmin} '{printf "-R%s/%s/%s/%s+r",lonmin,latmin,$3,latmax}'`
-    else
-        Rgeog=${R}
-    fi
-}
+###############################################################################
+# Definición de funciones que se usan en los scripts de animación.
+#
+#
+#
+# Juan Sánchez Segura <jsanchez.tiempo@gmail.com>
+# Marcos Molina Cano <marcosmolina.tiempo@gmail.com>
+# Guillermo Ballester Valor <gbvalor@gmail.com>                      04/10/2018
+###############################################################################
 
 
-
+# Función que amplia la R de GMT para que al cortar la región en un grid no se corte cuando se pinta un frame.
+# Si la proyección es cilindrica no hay problema. Si es orthográfica o estereográfica habrá que ampliar.
+# Parámetros:
+#   $1: R de la proyección
+#   $2: J de la proyección
+# Rgeog lleva la R ampliada
 function RGeog {
 
     local R=$1
     local J=$2
-
 
     proy=`echo ${J} | sed -n 's/\-J\(.\).*/\1/p'`
     if [ ${R} != "-Rd" ] && ( [ ${proy} == "G" ] || [ ${proy} == "S" ] )
@@ -106,13 +97,14 @@ function RGeog {
         Rgeog=${R}
     else
         Rgeog=`echo ${R} | sed 's/^-R//' | awk -F "/" '{printf "-R%.2f/%.2f/%.2f/%.2f",$1-0.1,$2+0.1,$3-0.1,$4+0.1}'`
-#        Rgeog=${R}
 
     fi
 }
 
 
-# Chequea un directorio
+# Función que chequea si existe un directorio y sino pregunta y lo crea
+# Parámetros:
+#   $1: R de la proyección
 function checkdir () {
     local dir=$@
     if [ ! -d ${dir} ] && [ ${OVERWRITE} -eq 0 ]
@@ -126,7 +118,7 @@ function checkdir () {
     mkdir -p ${dir} || exit 1
 }
 
-# Chequea los directorios y los crea si no existen
+# Función que chequea los directorios y los crea si no existen
 function checkDIRS () {
 
     checkdir ${PREFIX}
@@ -166,15 +158,19 @@ function buscarFrontera () {
 }
 
 
-
+# Función que imprime un mensaje en pantalla junto a la fecha
+# Parámetros:
+#   $1: Texto del mensaje
 function printMessage {
     echo `date +"[%Y/%m/%d %H:%M:%S]"` $1
 }
 
 
-
-
-
+# Función que chequean si existen los grids en un rango de fechas
+# Parámetros:
+#   $1: fecha de inicio
+#   $2: fecha final
+#   $3: fecha de pasada
 function checkGrids {
     local fecha=$1  #min
     local fechamax=$2  #max
@@ -193,7 +189,12 @@ function checkGrids {
     done
 }
 
-
+# Función que procesa los grids en un rango de fechas
+# Parámetros:
+#   $1: variable
+#   $2: fecha de inicio
+#   $3: fecha final
+#   $4: fecha de pasada
 function procesarGrids {
 
     local fecha=$2  #min
@@ -218,7 +219,6 @@ function procesarGrids {
     while [ ${fecha} -le ${fechamax} ]
     do
         printMessage "Procesando grid ${vardst}: ${fecha}"
-
 
         RGeog ${R} ${J}
 
@@ -247,6 +247,14 @@ function procesarGrids {
 
 }
 
+
+# Función que calcula el valor máximo y el valor mínimo entre los grids de un rango de fechas
+# Parámetros:
+#   $1: variable
+#   $2: fecha de inicio
+#   $3: fecha final
+#   $4:
+# En la variable zmin se escribe el mínimo y en zmax el máximo
 function calcularMinMax {
 
     local vardst=$1
@@ -281,7 +289,10 @@ function calcularMinMax {
 
 }
 
-
+# Función que genera un frame
+# Parámetros:
+#   $1: color que se convierte en transparente
+#   $2: factor de transparencia a aplicar
 function generarFrame {
 
     local tcolor=$1
@@ -316,8 +327,14 @@ function generarFrame {
 
 
 
-
-
+# Función que genera los frames de una variable
+# Parámetros:
+#   $1: variable
+#   $2: fecha de inicio
+#   $3: fecha final
+#   $4: minutos en los que se genera un frame
+#   $5: color que se convierte en transparente
+#   $6: factor de transparencia a aplicar
 function generarFrames {
     local var=$1
     local min=$2
@@ -332,8 +349,6 @@ function generarFrames {
     printMessage "Generando los frames de ${var} desde ${min} hasta ${max} cada ${mins} minutos"
     while [ ${fecha} -le ${max} ]
     do
-
-#        fecha=`date -u --date="${ti:0:8} ${ti:8:2}" +%Y%m%d%H%M`
         tfile=${TMPDIR}/${fecha}_${var}.nc
 
         tmpFile="${TMPDIR}/${fecha}-${var}.ps"
@@ -350,7 +365,13 @@ function generarFrames {
 
 
 
-
+# Función que genera los frames de una variable
+# Parámetros:
+#   $1: variable
+#   $2: fecha de inicio
+#   $3: fecha final
+#   $4: minutos en los que se interpola un grid
+#   $5: salto en horas entre dos grids originales
 function interpolarFrames {
 
     local var=$1
@@ -387,12 +408,9 @@ function interpolarFrames {
 
     fi
 
-
     ti=${min}
     nframe=0
 
-
-#    printMessage "Generando los frames de Intensidad del Viento (UV) desde ${min} hasta ${max} cada ${mins} minutos"
     printMessage "Interpolando grids de ${var} desde ${min} hasta ${max} cada ${mins} minutos"
     while [ ${ti} -lt ${max} ]
     do
@@ -421,31 +439,16 @@ function interpolarFrames {
         A1="${TMPDIR}/a1.nc"
         A2="${TMPDIR}/a2.nc"
 
-
-#        fecha=`date -u --date="${ti:0:8} ${ti:8:2}" +%Y%m%d%H%M`
-#        tfile=${TMPDIR}/${fecha}_${var}.nc
-
         tmpFile="${TMPDIR}/${fecha}-${var}.ps"
 
-#        if [ ${fecha} -ge ${minreal} ]
-#        then
-#            generarFrame
-#            nframe=$((${nframe}+1))
-#        fi
-
-
-        # Obtenemos los netcdf intermedios haciendo la interpolación cada mins minutos
-    #    for((i=2; i<30; i+=2))
         totalmins=$((${step}*60))
         for((m=${mins}; m<${totalmins}; m+=${mins}))
         do
 
-    #        t=`awk -v var=${i} 'BEGIN{printf "%.4f\n",var/30}'`
-    #        mins=`awk -v var=${i} 'BEGIN{printf "%d\n",180*var/30}'`
 
             # t tiene que ser entre 0 y 1
             t=`awk -v var=${m} -v totalmins=${totalmins} 'BEGIN{printf "%.4f\n",var/totalmins}'`
-    #        mins=`awk -v var=${i} 'BEGIN{printf "%d\n",180*var/30}'`
+
             fecha=`date -u --date="${ti:0:8} ${ti:8:2} +${m} minutes" +%Y%m%d%H%M`
 
             tfile=${TMPDIR}/${fecha}_${var}.nc
@@ -456,36 +459,17 @@ function interpolarFrames {
             # interpolamos el fichero con la formula (a2*t^3 + a1*t^2 + a0*t + a-1)/2
             ${GMT} grdmath ${A_1} ${A0} ${t} MUL ADD ${A1} ${t} 2 POW MUL ADD ${A2} ${t} 3 POW MUL ADD 2 DIV = ${tfile}
 
-
-#            if [ ${fecha} -ge ${minreal} ]
-#            then
-#                generarFrame
-#                nframe=$((${nframe}+1))
-#            fi
         done
 
         ti=`date -u --date="${ti:0:8} ${ti:8:2} +${step} hours" +%Y%m%d%H%M`
     done
 
-
-
-#    fecha=`date -u --date="${ti:0:8} ${ti:8:2}" +%Y%m%d%H%M`
-#    tfile=${TMPDIR}/${fecha}_${var}.nc
-#
-#    tmpFile="${TMPDIR}/${fecha}-${var}.ps"
-
-#    if [ ${fecha} -ge ${minreal} ]
-#    then
-#        generarFrame
-#        nframe=$((${nframe}+1))
-#    fi
-
-
-
-
 }
 
 
+# Función que convierte el canal R de los frames de una variable en canal alfa y lo aplica en un fondo blanco
+# Parámetros:
+#   $1: variable
 function black2transparentFrames {
 
     local var=$1
@@ -503,7 +487,9 @@ function black2transparentFrames {
 
 }
 
-
+# Función que replica los frames de una variable en función del valor de slowmotion
+# Parámetros:
+#   $1: variable
 function replicarFrames {
 
     local var=$1
@@ -542,21 +528,23 @@ function replicarFrames {
 
 
 
-
+# Función que interpola grids de precipitación linealmente dividiendo
+# el acumulado de 3 horas entre 3
+# Parámetros:
+#   $1: variable
+#   $2: fecha de inicio
+#   $3: fecha final
 function interpolarPRECLineal {
 
     local vardst=$1
     local min=$2
     local max=$3
-#    local fechapasada=$4
 
-#    local ratevar=${variablesprocesar[0]}
     local acumvar=${variablesprocesar[1]}
 
     local fecha=`date -u --date="${min:0:8} ${min:8:2} +3 hours" +%Y%m%d%H%M`
-#    local nframe=0
 
-    #printMessage "Interpolando grids de PREC desde ${min} hasta ${max} cada ${mins} minutos"
+
     printMessage "Interpolando grids de PREC desde ${min} hasta ${max} cada 60 minutos"
     while [ ${fecha} -le ${max} ]
     do
@@ -600,20 +588,23 @@ function interpolarPRECLineal {
 
 }
 
+# Función que interpola grids de precipitación teniendo también en cuenta la
+# tasa de precipitación
+# Parámetros:
+#   $1: variable
+#   $2: fecha de inicio
+#   $3: fecha final
 function interpolarPRECMejorada {
 
     local vardst=$1
     local min=$2
     local max=$3
-#    local fechapasada=$4
 
     local ratevar=${variablesprocesar[0]}
     local acumvar=${variablesprocesar[1]}
 
     local fecha=`date -u --date="${min:0:8} ${min:8:2} +3 hours" +%Y%m%d%H%M`
-#    local nframe=0
 
-    #printMessage "Interpolando grids de PREC desde ${min} hasta ${max} cada ${mins} minutos"
     printMessage "Interpolando grids de PREC desde ${min} hasta ${max} cada 60 minutos"
     while [ ${fecha} -le ${max} ]
     do
@@ -654,7 +645,6 @@ function interpolarPRECMejorada {
         ${GMT} grdmath ${acumFile} ${acumFile25} SUB = ${acumFileDiff25}
 
         fileAnt=${acumFileAnt}
-    #    for((m=${mins}; m<180; m+=${mins}))
         for((m=60; m<180; m+=60))
         do
             secs=$((${m}*60))
@@ -710,12 +700,14 @@ function interpolarPRECMejorada {
 }
 
 
-
+# Función que interpola grids de precipitación con interpolación mejorada hasta 72 horas e interpolación lineal después
+# Parámetros:
+#   $1: variable
+#   $2: fecha de inicio
+#   $3: fecha final
+#   $4: fecha de la pasada
 function interpolarPREC {
 
-
-#    local vardst=$1
-#    cp ${TMPDIR}/${min}_acumprec.nc ${TMPDIR}/${min}_prec.nc
     local vardst=$1
     local min=$2
     local max=$3
@@ -734,128 +726,16 @@ function interpolarPREC {
         interpolarPRECLineal ${vardst} ${fechalimite} ${max}
     fi
 
-
-
-
-#    local ratevar=${variablesprocesar[0]}
-#    local acumvar=${variablesprocesar[1]}
-#
-#    local fecha=`date -u --date="${min:0:8} ${min:8:2} +3 hours" +%Y%m%d%H%M`
-#    local nframe=0
-#
-#    #printMessage "Interpolando grids de PREC desde ${min} hasta ${max} cada ${mins} minutos"
-#    printMessage "Interpolando grids de PREC desde ${min} hasta ${max} cada 60 minutos"
-#    while [ ${fecha} -le ${max} ]
-#    do
-#
-#
-#        fechaAnt=`date -u --date="${fecha:0:8} ${fecha:8:2} -3 hours" +%Y%m%d%H%M`
-#
-#        acumFile=${TMPDIR}/${fecha}_${acumvar}.nc
-#        acumFileAnt=${TMPDIR}/${fechaAnt}_${acumvar}.nc
-#
-#        rateFile=${TMPDIR}/${fecha}_${ratevar}.nc
-#        rateFileAnt=${TMPDIR}/${fechaAnt}_${ratevar}.nc
-#
-#        fecha05=`date -u --date="${fechaAnt:0:8} ${fechaAnt:8:2} +1800 secs" +%Y%m%d%H%M`
-#        fecha25=`date -u --date="${fecha:0:8} ${fecha:8:2} -1800 secs" +%Y%m%d%H%M`
-#        acumFile05=${TMPDIR}/${fecha05}_${acumvar}.nc
-#        acumFile25=${TMPDIR}/${fecha25}_${acumvar}.nc
-#
-#        ${GMT} grdmath ${acumFileAnt} ${rateFileAnt} 1800 MUL ADD = ${acumFile05}
-#        ${GMT} grdclip -Sb0/0 ${acumFile05} -G${acumFile05}
-#        ${GMT} grdmath ${acumFile} ${rateFile} 1800 MUL SUB = ${acumFile25}
-#        ${GMT} grdclip -Sb0/0 ${acumFile25} -G${acumFile25}
-#
-#        ${GMT} grdmath ${acumFile25} ${acumFile05} LT 0 NAN ${acumFile05} ${acumFile25} ADD 2 DIV MUL ${acumFile25} DENAN = ${TMPDIR}/kk25.nc
-#        ${GMT} grdmath ${acumFile25} ${acumFile05} LT 0 NAN ${TMPDIR}/kk25.nc MUL ${acumFile05} DENAN = ${acumFile05}
-#        mv ${TMPDIR}/kk25.nc ${acumFile25}
-#
-#        #Acumulado entre el minuto 30 y el 150
-#        acumFileDiff=${TMPDIR}/diff.nc
-#        ${GMT} grdmath ${acumFile25} ${acumFile05} SUB = ${acumFileDiff}
-#
-#        #Acumulado entre el minuto 0 y el 30
-#        acumFileDiff05=${TMPDIR}/diff05.nc
-#        ${GMT} grdmath ${acumFile05} ${acumFileAnt} SUB = ${acumFileDiff05}
-#
-#        #Acumulado entre el minuto 150 y el 180
-#        acumFileDiff25=${TMPDIR}/diff25.nc
-#        ${GMT} grdmath ${acumFile} ${acumFile25} SUB = ${acumFileDiff25}
-#
-#        fileAnt=${acumFileAnt}
-#    #    for((m=${mins}; m<180; m+=${mins}))
-#        for((m=60; m<180; m+=60))
-#        do
-#            secs=$((${m}*60))
-#            secs1=0
-#            secs2=0
-#            secs3=0
-#            if [ ${secs} -lt 1800 ] # Menor que 30 minutos
-#            then
-#                secs1=${secs}
-#            elif [ ${secs} -lt 9000 ] # Menor que 2 horas y 30 minutos
-#            then
-#                secs1=1800
-#                secs2=$((${secs}-${secs1}))
-#            else
-#                secs1=1800
-#                secs2=7200
-#                secs3=$((${secs}-${secs1}-${secs2}))
-#            fi
-#
-#            fechai=`date -u --date="${fechaAnt:0:8} ${fechaAnt:8:4} +${m} minutes" +%Y%m%d%H%M`
-#
-#            printMessage "Interpolando grid ${fechai}"
-#
-#            acumFilei=${TMPDIR}/${fechai}_${acumvar}.nc
-#
-#            if [ ! -f ${acumFilei} ]
-#            then
-#                ${GMT} grdmath ${acumFileDiff05} ${secs1} MUL 1800 DIV ${acumFileDiff} ${secs2} MUL 7200 DIV ${acumFileDiff25} ${secs3} MUL 1800 DIV ADD ADD ${acumFileAnt} ADD = ${acumFilei}
-#            fi
-#
-#            if [ ${esprecacum} -eq 0 ]
-#            then
-#                ${GMT} grdmath ${acumFilei} ${fileAnt} SUB = ${TMPDIR}/${fechai}_${vardst}.nc
-#                fileAnt=${acumFilei}
-#            fi
-#
-#        done
-#
-#        if [ ${esprecacum} -eq 0 ]
-#        then
-#            ${GMT} grdmath ${acumFile} ${fileAnt} SUB = ${TMPDIR}/${fecha}_${vardst}.nc
-#        fi
-#
-#        fecha=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
-#    done
-#
-#    if [ ${esprecacum} -eq 0 ]
-#    then
-#        fecha=`date -u --date="${min:0:8} ${min:8:2} +1 hours" +%Y%m%d%H%M`
-#        cp ${TMPDIR}/${fecha}_${vardst}.nc ${TMPDIR}/${min}_${vardst}.nc
-#    fi
 }
-
-
-
-
-
-
-
-
-
 
 
 
 
 #####################################
 
-
-
-
-
+# Función que pinta unas anotaciones al final de la animación
+# Parámetros:
+#   $1: archivo de etiquetas
 function pintarAnotaciones {
 
     local fileLabels=$1
@@ -916,7 +796,14 @@ function pintarAnotaciones {
 
 }
 
-
+# Función que calcula los máximos locales de un grid
+# Parámetros:
+#   $1: fecha del grid
+#   $2: variable
+#   $3: límite de maximos
+#   $4: umbral por el que por debajo se descartan los máximos
+#   $5: código de región. Se descartan los máximos fuera de esa región
+# Los máximos se escriben en el archivo Tlabels.txt
 function calcularMaximos {
 
     local fecha=$1
@@ -955,7 +842,6 @@ function calcularMaximos {
         filecoord=`echo ${TMPDIR}/coords.csv | sed 's/\//\\\\\//g'`
         sed "s/_FILECOORDS/${filecoord}/" coords.vrt > ${TMPDIR}/coords.vrt
         ${OGR2OGR} -f "ESRI Shapefile" ${TMPDIR}/coords ${TMPDIR}/coords.vrt
-#        ${OGR2OGR} -f gpkg ${TMPDIR}/merged.gpkg fronteras/gadm28_adm0.shp -where "ISO2='${cod}'"
         ${OGR2OGR} -f gpkg ${TMPDIR}/merged.gpkg ${TMPDIR}/tmpREG.gmt
         ${OGR2OGR} -f gpkg -append -update ${TMPDIR}/merged.gpkg ${TMPDIR}/coords/output.shp
         ${OGR2OGR} -f csv ${TMPDIR}/coordsfilter.csv -dialect sqlite -sql "SELECT b.x,b.y,b.z FROM tmpREG a, output b  WHERE contains(a.geom, b.geom)"  ${TMPDIR}/merged.gpkg
@@ -975,82 +861,13 @@ function calcularMaximos {
      awk -v xsize=${xsize} -v ysize=${ysize} -v xlength=${xlength} -v ylength=${ylength} -f awk/filtrarintersecciones.awk \
      | head -n ${nmax} > ${TMPDIR}/Tlabels.txt
 
-
-
-
-
-
 }
 
 
-#
-#function calcularMinimos {
-#
-#    local fecha=$1
-#    local var=$2
-#    local nmax=$3
-#    local umbral=$4
-#    local cod=$5
-#
-#
-#    local dataFile=${TMPDIR}/${fecha}_${var}.nc
-#
-#    printMessage "Calculando los MÍNIMOS locales de ${var}"
-#
-#
-#    ${GMT} grdmath ${dataFile} DUP EXTREMA -2 EQ MUL = ${TMPDIR}/kk
-#    ${GMT} grdfilter ${TMPDIR}/kk -G${TMPDIR}/kk -Dp -Ffmconv.nc -Np
-#    ${GMT} grdmath  ${TMPDIR}/kk 0 NAN = ${TMPDIR}/kk
-#
-#
-#    ${GMT} grd2xyz -s ${TMPDIR}/kk | awk '{printf "%s %s %d\n",$1,$2,int($3+0.5)}' |  awk -v umbral=${umbral} '$3<umbral' | sort -k3 -n > ${TMPDIR}/contourlabels.txt
-#
-#
-#
-#    if [ ! -z ${cod} ]
-#    then
-#        buscarFrontera ${TMPDIR}/tmpREG.gmt ${cod}
-#
-#        comando="cat"
-#        if [ ! -z ${global} ] && [  ${global} -eq 1 ]
-#        then
-#            comando="${GMT} mapproject -JX${xlength}c/${ylength}c ${RAMP} -I"
-#        fi
-#
-#        cat ${TMPDIR}/contourlabels.txt | ${comando} | ${GMT} mapproject ${JGEOG} ${RGEOG} -I | awk 'BEGIN{print "x,y,z"}{printf "%s,%s,%.0f\n",$1,$2,$3}' > ${TMPDIR}/coords.csv
-#
-#        filecoord=`echo ${TMPDIR}/coords.csv | sed 's/\//\\\\\//g'`
-#        sed "s/_FILECOORDS/${filecoord}/" coords.vrt > ${TMPDIR}/coords.vrt
-#        ${OGR2OGR} -f "ESRI Shapefile" ${TMPDIR}/coords ${TMPDIR}/coords.vrt
-##        ${OGR2OGR} -f gpkg ${TMPDIR}/merged.gpkg fronteras/gadm28_adm0.shp -where "ISO2='${cod}'"
-#        ${OGR2OGR} -f gpkg ${TMPDIR}/merged.gpkg ${TMPDIR}/tmpREG.gmt
-#        ${OGR2OGR} -f gpkg -append -update ${TMPDIR}/merged.gpkg ${TMPDIR}/coords/output.shp
-#        ${OGR2OGR} -f csv ${TMPDIR}/coordsfilter.csv -dialect sqlite -sql "SELECT b.x,b.y,b.z FROM tmpREG a, output b  WHERE contains(a.geom, b.geom)"  ${TMPDIR}/merged.gpkg
-#
-#        comando="cat"
-#        if [ ! -z ${global} ] && [  ${global} -eq 1 ]
-#        then
-#            comando="${GMT} mapproject -JX${xlength}c/${ylength}c ${RAMP}"
-#        fi
-#
-#        awk -F "," 'NR>1{print $1,$2,$3}'  ${TMPDIR}/coordsfilter.csv  | ${GMT} mapproject ${JGEOG} ${RGEOG}|\
-#         ${comando}  | sort -k3,3 -n   > ${TMPDIR}/contourlabels.txt
-#
-#    fi
-#
-#    awk '{print $1,$2,$3}'  ${TMPDIR}/contourlabels.txt  |\
-#     awk -v xsize=${xsize} -v ysize=${ysize} -v xlength=${xlength} -v ylength=${ylength} -f awk/filtrarintersecciones.awk \
-#     | head -n ${nmax} > ${TMPDIR}/Tlabels.txt
-#
-#
-#
-#
-#
-#
-#}
-
-
-
+# Función que calcula los mínimos de temperatura en los centros de las danas de gh500
+# Parámetros:
+#   $1: fecha del grid
+# Los mínimos se escriben en el archivo Tlabels.txt
 function calcularMinimosDanas {
 
     local fecha=$1
@@ -1068,129 +885,4 @@ function calcularMinimosDanas {
      -f awk/filtrarintersecciones.awk > ${TMPDIR}/Tlabels.txt
 
 }
-
-
-
-
-
-
-
-
-
-
-
-function pintarMaximosPREC {
-
-
-    fecha=$1
-    nframe=$2
-
-
-    dataFile=${TMPDIR}/${fecha}_acumprec.nc
-
-    printMessage "Calculando los máximos locales de la precipitación"
-
-#    ${OGR2OGR} -where "ISO2='ES'" -f "GMT" ${TMPDIR}/tmpREG0.gmt fronteras/gadm28_adm0.shp
-    ${GMT} pscoast -EES -M > ${TMPDIR}/tmpREG0.gmt
-
-
-    ${GMT} grdcontour ${dataFile} ${J} ${R} -A100+t"${TMPDIR}/contourlabels.txt" -T++a+d20p/1p+lLH -Q100 -Gn1/2c  -C10 > /dev/null
-    ${GMT} grdtrack ${TMPDIR}/contourlabels.txt -G${dataFile} > ${TMPDIR}/kkcontourlabels.txt
-    mv ${TMPDIR}/kkcontourlabels.txt ${TMPDIR}/contourlabels.txt
-
-#    read w h < <(${GMT} grdinfo -C ${dataFile} | awk '{print $3,$5}')
-    read w h < <(${GMT} mapproject -R -J -W)
-
-    cat ${TMPDIR}/contourlabels.txt | ${GMT} mapproject ${JGEOG} ${RGEOG} -I | awk 'BEGIN{print "x,y,z"}{if($4=="H") printf "%s,%s,%.0f\n",$1,$2,$5}' > ${TMPDIR}/coords.csv
-
-    filecoord=`echo ${TMPDIR}/coords.csv | sed 's/\//\\\\\//g'`
-    sed "s/_FILECOORDS/${filecoord}/" coords.vrt > ${TMPDIR}/coords.vrt
-    ${OGR2OGR} -f "ESRI Shapefile" ${TMPDIR}/coords ${TMPDIR}/coords.vrt
-    ${OGR2OGR} -f gpkg ${TMPDIR}/merged.gpkg fronteras/gadm28_adm0.shp -where "ISO2='ES'"
-    ${OGR2OGR} -f gpkg -append -update ${TMPDIR}/merged.gpkg ${TMPDIR}/coords/output.shp
-    ${OGR2OGR} -f csv ${TMPDIR}/coordsfilter.csv -dialect sqlite -sql "SELECT b.x,b.y,b.z FROM gadm28_adm0 a, output b  WHERE contains(a.geom, b.geom)"  ${TMPDIR}/merged.gpkg
-
-
-    ########### HAY QUE QUITAR EL MAPPROJECT CUANDO SE REPROYECTEN LOS GRIDS !!!!!!
-#    awk '{if($4=="H") printf "%s %s %.0f\n",$1,$2,$5}' ${TMPDIR}/contourlabels.txt | sort -k3,3 -n -r | head -n 15 | ${GMT} mapproject -R -J > ${TMPDIR}/Tlabels.txt
-    awk -F "," 'NR>1{print $1,$2,$3}'  ${TMPDIR}/coordsfilter.csv  | sort -k3,3 -n -r | ${GMT} mapproject ${JGEOG} ${RGEOG} | awk  -f awk/filtrarintersecciones.awk  | head -n 10 > ${TMPDIR}/Tlabels.txt
-
-
-
-
-
-    read rotulowidth rotuloheight < <(${CONVERT} ${DIRROTULOS}/rotuloprec/rp000.png -ping -format "%w %h" info:)
-    filtro="[1]setpts=0.5*PTS+${nframe}/(25*TB)[rotulo0];[0]copy[out]"
-    textos=""
-    i=0
-    while read line
-    do
-        #echo $line
-        lon=`echo ${line} | awk '{print $1}'`
-        lat=`echo ${line} | awk '{print $2}'`
-        t=`echo ${line} | awk '{print $3}'`
-        x=`awk -v x=${lon} -v w=${w} -v rw=65  'BEGIN{printf "%d",1920*x/w - rw }'`
-        y=`awk -v y=${lat} -v h=${h} -v rh=${rotuloheight} 'BEGIN{printf "%d",1080-1080*y/h - rh/2 }'`
-#        if [ ${y} -lt 0 ]
-#        then
-#
-#        fi
-
-
-        xtext=${x}
-        ytext=$((${y}+25))
-
-        filtro="${filtro};[rotulo${i}]split[rotulo${i}][rotulo$((${i}+1))]"
-#        if [ ${y} -lt 0 ]
-#        then
-#            filtro="${filtro};[rotulo${i}]vflip[rotulo${i}]"
-#            y=`awk -v y=${lat} -v h=${h}  'BEGIN{printf "%d",1080-1080*y/h}'`
-#            ytext=$((${y}+18+65))
-#        fi
-
-#        ${CONVERT} -font Roboto-Bold  -pointsize 26 -fill "white" -annotate +0+0 "${t}mm" -gravity east \( -size 180x50 xc:transparent \) \( +clone -background gray -shadow 80x2+1+1 -crop 180x50+0+0 \) +swap -composite png32:${TMPDIR}/t${i}.png
-        ${CONVERT} -size 180x50 xc:none -font Roboto-Bold  -pointsize 26 -fill "white" -gravity east -annotate +0+0 "${t}mm"   \( +clone -background none -shadow 80x2+1+1 \) +swap -flatten -crop 180x50+0+0 png32:${TMPDIR}/t${i}.png
-        textos="${textos} -f image2  -i ${TMPDIR}/t${i}.png"
-
-        filtro="${filtro};[out][rotulo${i}]overlay= x=${x}: y=${y}[out]; [out][$((${i}+2))]overlay= x=${xtext}: y=${ytext}: enable=gt(n\,$((${nframe}+22)))[out]"
-#        filtro="${filtro};[out][rotulo${i}]overlay= x=${x}: y=${y}[out]; [out]drawtext=fontsize=30:fontfile=Roboto-Bold.ttf:text=\'${t} mm\':x=${xtext}:y=${ytext}:enable=gt(n\,$((${nframe}+22)))[out]"
-
-        i=$((${i}+1))
-
-#        rename -f 's/kkd/kkc/' ${TMPDIR}/kkd-*.png
-
-    done < <(sed '$ d' ${TMPDIR}/Tlabels.txt)
-
-    line=`tail -n 1 ${TMPDIR}/Tlabels.txt`
-
-    lon=`echo ${line} | awk '{print $1}'`
-    lat=`echo ${line} | awk '{print $2}'`
-    t=`echo ${line} | awk '{print $3}'`
-    x=`awk -v x=${lon} -v w=${w} -v rw=65 'BEGIN{printf "%d",1920*x/w - rw}'` #rw es la distancia en pixeles desde el pixel 0 hasta el centro del punto
-    y=`awk -v y=${lat} -v h=${h} -v rh=${rotuloheight} 'BEGIN{printf "%d",1080-1080*y/h - rh/2 }'`
-
-
-    xtext=${x}
-    ytext=$((${y}+25))
-#    if [ ${y} -lt 0 ]
-#    then
-#        filtro="${filtro};[rotulo${i}]vflip[rotulo${i}]"
-#        y=`awk -v y=${lat} -v h=${h}  'BEGIN{printf "%d",1080-1080*y/h}'`
-#        ytext=$((${y}+18+65))
-#    fi
-
-#    ${CONVERT} -font Roboto-Bold  -pointsize 26 -fill "white" -annotate +0+0 "${t}mm" -gravity east \( -size 180x50 xc:transparent \) \( +clone -background gray -shadow 80x2+1+1 -crop 180x50+0+0 \) +swap -composite png32:${TMPDIR}/t${i}.png
-    ${CONVERT} -size 180x50 xc:none -font Roboto-Bold  -pointsize 26 -fill "white" -gravity east -annotate +0+0 "${t}mm"   \( +clone -background none -shadow 80x2+1+1 \) +swap -flatten -crop 180x50+0+0 png32:${TMPDIR}/t${i}.png
-    textos="${textos} -f image2  -i ${TMPDIR}/t${i}.png"
-    filtro="${filtro};[out][rotulo${i}]overlay= x=${x}: y=${y}[out];[out][$((${i}+2))]overlay= x=${xtext}: y=${ytext}:enable=gt(n\,$((${nframe}+22)))"
-#    filtro="${filtro};[out][rotulo${i}]overlay= x=${x}: y=${y}[out];[out]drawtext=fontsize=30:fontfile=Roboto-Bold.ttf:text=\'${t} mm\':x=${xtext}:y=${ytext}:enable=gt(n\,$((${nframe}+22)))"
-
-    printMessage "Insertando una animación por cada punto calculado"
-    ${FFMPEG} -f image2 -i  ${TMPDIR}/kkb-%03d.png -f image2  -i ${DIRROTULOS}/rotuloprec/rp%03d.png  ${textos} -filter_complex "${filtro}" -y -c:v png -f image2 ${TMPDIR}/kkc-%03d.png 2>> ${errorsFile}
-    rename -f 's/kkc/kkb/' ${TMPDIR}/kkc-*.png
-
-}
-
-
-
 

@@ -497,7 +497,7 @@ function replicarFrames {
     printMessage "Replicando frames de variable ${var}"
     if [ ${slowmotion} -gt 1 ]
     then
-        ${FFMPEG} -f image2 -i ${TMPDIR}/${var}%03d.png -filter_complex "setpts=${slowmotion}*PTS+1" -f image2 ${TMPDIR}/kk%03d.png -vsync 1 2>> ${errorsFile}
+        ${FFMPEG} -f image2 -i ${TMPDIR}/${var}%03d.png -threads 1 -filter_complex "setpts=${slowmotion}*PTS+1" -f image2 ${TMPDIR}/kk%03d.png -vsync 1 2>> ${errorsFile}
         rm -rf ${TMPDIR}/${var}*.png
         rename -f "s/kk/${var}/" ${TMPDIR}/kk*.png
     fi
@@ -517,7 +517,7 @@ function replicarFrames {
 
     filtro="[0]${filtro}"
 
-    ${FFMPEG} -f image2 -i ${TMPDIR}/${var}%03d.png -filter_complex "${filtro}" -vsync 0 ${TMPDIR}/kk%03d.png 2>> ${errorsFile}
+    ${FFMPEG} -f image2 -i ${TMPDIR}/${var}%03d.png -threads 1 -filter_complex "${filtro}" -vsync 0 ${TMPDIR}/kk%03d.png 2>> ${errorsFile}
 
     rm -rf ${TMPDIR}/${var}*.png
     rename -f "s/kk/${var}/" ${TMPDIR}/kk*.png
@@ -792,7 +792,7 @@ function pintarAnotaciones {
 
     printMessage "Insertando una animación por cada punto calculado"
 #    echo $filtro
-    ${FFMPEG} -f image2 -i  ${TMPDIR}/transparent.png -f image2  -i ${DIRROTULOS}/rotuloprec/rp%03d.png  ${textos} -filter_complex "${filtro}" -r 25 -y -c:v png -f image2 ${TMPDIR}/anot%03d.png 2>> ${errorsFile}
+    ${FFMPEG} -f image2 -i  ${TMPDIR}/transparent.png -f image2  -i ${DIRROTULOS}/rotuloprec/rp%03d.png  ${textos} -threads 1 -filter_complex "${filtro}" -r 25 -y -c:v png -f image2 ${TMPDIR}/anot%03d.png 2>> ${errorsFile}
 
 }
 

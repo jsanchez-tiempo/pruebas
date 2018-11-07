@@ -443,12 +443,12 @@ then
     outputFile=`realpath ${dirprev}/${outputFile}`
 fi
 
-if ! [[ ${presscfgfile} == /* ]]
+if [ ! -z ${presscfgfile} ] && ! [[ ${presscfgfile} == /* ]]
 then
     presscfgfile=`realpath ${dirprev}/${presscfgfile}`
 fi
 
-if ! [[ ${labelsfile} == /* ]]
+if [ ! -z ${labelsfile} ] && ! [[ ${labelsfile} == /* ]]
 then
     labelsfile=`realpath ${dirprev}/${labelsfile}`
 fi
@@ -947,7 +947,7 @@ then
     printMessage "Uniendo los frames de las variables ${variablesanimacion[*]} y superponiendo frontera"
     variablefondo=`echo ${variablesanimacion[*]} | tr " " "-"`
     # Unimos los frames de las variables y le ponemos la frontera
-    ${FFMPEG} ${opcionesEntrada} -f image2 -i ${fronterasPNG} -filter_complex ${filtro} -vsync 0 ${TMPDIR}/kk%03d.png 2>> ${errorsFile}
+    ${FFMPEG} ${opcionesEntrada} -f image2 -i ${fronterasPNG} -threads 1 -filter_complex ${filtro} -vsync 0 ${TMPDIR}/kk%03d.png 2>> ${errorsFile}
     rename -f "s/kk/${variablefondo}/" ${TMPDIR}/kk*.png
 fi
 
@@ -1048,7 +1048,7 @@ then
 
         printMessage "Uniendo frames de isobaras con frames de máximos y mínimos"
         # Unimos los frames de las isobaras con los de máximos y mínimos
-        ${FFMPEG} -f image2 -i ${TMPDIR}/msl%03d.png -f image2 -i ${TMPDIR}/mslhl%03d.png -filter_complex "overlay" ${TMPDIR}/kk%03d.png 2>> ${errorsFile}
+        ${FFMPEG} -f image2 -i ${TMPDIR}/msl%03d.png -f image2 -i ${TMPDIR}/mslhl%03d.png -threads 1 -filter_complex "overlay" ${TMPDIR}/kk%03d.png 2>> ${errorsFile}
         rm -rf ${TMPDIR}/msl*.png
         rename -f 's/kk/msl/' ${TMPDIR}/kk*.png
     fi
@@ -1631,8 +1631,8 @@ printMessage "Generando vídeo final....."
 
 
 # Generamos el vídeo del final
-${FFMPEG} -y -f image2 -i ${fondoPNG} ${framesViento} ${escalas} -f image2 -i ${framescartel} ${opciones} ${logos} -i ${fondomar} \
- ${framesUV} ${framesPress} ${frameSombra} ${framesanotaciones} ${frameslabels} -filter_complex ${filtro}  ${outputFile} 2>> ${errorsFile}
+${FFMPEG} -y  -f image2 -i ${fondoPNG} ${framesViento} ${escalas} -f image2 -i ${framescartel} ${opciones} ${logos} -i ${fondomar} \
+ ${framesUV} ${framesPress} ${frameSombra} ${framesanotaciones} ${frameslabels} -threads 1 -filter_complex ${filtro}  ${outputFile} 2>> ${errorsFile}
 
 printMessage "¡Se ha generado el vídeo `basename ${outputFile}` con exito!"
 

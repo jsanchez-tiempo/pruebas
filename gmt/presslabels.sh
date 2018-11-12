@@ -97,10 +97,10 @@ function usage() {
 # Función que borra los directorios temporales
 function borrarDirectoriosTemporales() {
     # Busca los directorios temporales que estén siendo bloqueados por otros proceso
-    excludedirs=`ls /tmp/$(basename $(type $0 | awk '{print $3}')).*/lock |\
-     sed 's/\/tmp\/\(.*\)\/lock/\1/' | awk '{printf "! -name %s ",$0}'`
+    excludedirs=`ls ${TMPBASEDIR}/$(basename $(type $0 | awk '{print $3}')).*/lock |\
+     sed 's/\'${TMPBASEDIR}'\/\(.*\)\/lock/\1/' | awk '{printf "! -name %s ",$0}'`
     # Borra todos los directorios temporales excepto los que esten siendo utilizados
-    find /tmp/ -name "$(basename $(type $0 | awk '{print $3}')).*" ${excludedirs} -type d -exec rm -rf {} + 2> /dev/null
+    find ${TMPBASEDIR}/ -name "$(basename $(type $0 | awk '{print $3}')).*" ${excludedirs} -type d -exec rm -rf {} + 2> /dev/null
 }
 
 
@@ -430,7 +430,6 @@ dminletras=${umbralPress}
 
 
 
-TMPDIR="/tmp"
 
 
 
@@ -439,7 +438,7 @@ if [ ${ultimoTMP} -eq 1 ]
 then
     [ ${CLEAN} -eq 1 ] && \
         { echo "Error: La opción --clean no se puede usar junto a la opción -r" >&2; usage; exit 1; }
-    dir=`ls -1dtr ${TMPDIR}/$(basename $(type $0 | awk '{print $3}')).* | tail -n 1`
+    dir=`ls -1dtr ${TMPBASEDIR}/$(basename $(type $0 | awk '{print $3}')).* | tail -n 1`
 fi
 
 if [ ! -z ${dir} ]
@@ -468,7 +467,7 @@ then
 
 else
     # Diretorio temporal
-    TMPDIR=${TMPDIR}/`basename $(type $0 | awk '{print $3}').$$`
+    TMPDIR=${TMPBASEDIR}/`basename $(type $0 | awk '{print $3}').$$`
     mkdir -p ${TMPDIR}
 fi
 
@@ -516,6 +515,7 @@ then
     then
         printMessage "Procesando los grids para la variable '${variable}' desde ${min} hasta ${max}"
 
+        var=${variable}
         nvar=0
         # Procesamos los grids con las variables que necesitemos. Puede ser que haya que procesar más de una variable
         # como en la precipitación con la prec acumulada y la tasa de prec

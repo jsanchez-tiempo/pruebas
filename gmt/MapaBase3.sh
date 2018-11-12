@@ -473,7 +473,7 @@ fondomarsrc=${fondomar}
 
 
 # Creamos el directorio temporal de trabajo
-TMPDIR="/tmp/${scriptName}.$$"
+TMPDIR="${TMPBASEDIR}/${scriptName}.$$"
 #TMPDIR="/tmp/`basename $(type $0 | awk '{print $3}').$$`"
 mkdir -p ${TMPDIR}
 

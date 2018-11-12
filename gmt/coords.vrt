@@ -5,5 +5,8 @@
     <GeometryType>wkbPoint</GeometryType>
     <LayerSRS>WGS84</LayerSRS>
     <GeometryField encoding="PointFromColumns" x="x" y="y"/>
+    <Field name="x" type="Real"/>
+    <Field name="y" type="Real"/>
+    <Field name="z" type="Integer"/>
   </OGRVRTLayer>
 </OGRVRTDataSource>

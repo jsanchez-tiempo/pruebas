@@ -752,10 +752,8 @@ dminletras=${umbralPress}
 
 
 
-TMPDIR="/tmp"
-
 # Diretorio temporal
-TMPDIR=${TMPDIR}/`basename $(type $0 | awk '{print $3}').$$`
+TMPDIR=${TMPBASEDIR}/`basename $(type $0 | awk '{print $3}').$$`
 #TMPDIR=/tmp/animViento.sh.12766
 mkdir -p ${TMPDIR}
 
@@ -947,7 +945,7 @@ then
     printMessage "Uniendo los frames de las variables ${variablesanimacion[*]} y superponiendo frontera"
     variablefondo=`echo ${variablesanimacion[*]} | tr " " "-"`
     # Unimos los frames de las variables y le ponemos la frontera
-    ${FFMPEG} ${opcionesEntrada} -f image2 -i ${fronterasPNG} -threads 1 -filter_complex ${filtro} -vsync 0 ${TMPDIR}/kk%03d.png 2>> ${errorsFile}
+    ${FFMPEG} ${opcionesEntrada} -f image2 -i ${fronterasPNG} -threads 1 -filter_complex ${filtro} -vsync 0 ${TMPDIR}/kk%03d.png 2>> ${errorsFile} </dev/null
     rename -f "s/kk/${variablefondo}/" ${TMPDIR}/kk*.png
 fi
 
@@ -1048,7 +1046,7 @@ then
 
         printMessage "Uniendo frames de isobaras con frames de máximos y mínimos"
         # Unimos los frames de las isobaras con los de máximos y mínimos
-        ${FFMPEG} -f image2 -i ${TMPDIR}/msl%03d.png -f image2 -i ${TMPDIR}/mslhl%03d.png -threads 1 -filter_complex "overlay" ${TMPDIR}/kk%03d.png 2>> ${errorsFile}
+        ${FFMPEG} -f image2 -i ${TMPDIR}/msl%03d.png -f image2 -i ${TMPDIR}/mslhl%03d.png -threads 1 -filter_complex "overlay" ${TMPDIR}/kk%03d.png 2>> ${errorsFile} </dev/null
         rm -rf ${TMPDIR}/msl*.png
         rename -f 's/kk/msl/' ${TMPDIR}/kk*.png
     fi
@@ -1498,7 +1496,7 @@ ffinal=$(( ${nframesinicio}+${nframesloop} -1 ))
 # Fondo del mar
 # Obtenemos el número de frames que tienen el vídeo del fondo del mar. El vídeo de mar se replica de forma infinita y se
 # cogen los frames que vayamos a necesitar
-nframesmar=`${FFMPEG} -i ${fondomar} -vcodec copy -f rawvideo -y /dev/null 2>&1 | tr ^M '\n' | awk '/^frame=/ {print $2}'|tail -n 1`
+nframesmar=`${FFMPEG} -i ${fondomar} -vcodec copy -f rawvideo -y /dev/null 2>&1 </dev/null | tr ^M '\n' | awk '/^frame=/ {print $2}'|tail -n 1`
 filtro="[$((${nframerotulo}+${nlogos}+${pintarViento}+${nescalas}+1))]loop=-1:${nframesmar}:0[mar];[mar]trim=start_frame=0:end_frame=$((${nframefinal}+${nframesfinal}))[mar];[mar][0]overlay[out];"
 
 # Animación del fundido entre el mapa base y el mapa con variables
@@ -1632,8 +1630,8 @@ printMessage "Generando vídeo final....."
 
 # Generamos el vídeo del final
 ${FFMPEG} -y  -f image2 -i ${fondoPNG} ${framesViento} ${escalas} -f image2 -i ${framescartel} ${opciones} ${logos} -i ${fondomar} \
- ${framesUV} ${framesPress} ${frameSombra} ${framesanotaciones} ${frameslabels} -threads 1 -filter_complex ${filtro}  ${outputFile} 2>> ${errorsFile}
+ ${framesUV} ${framesPress} ${frameSombra} ${framesanotaciones} ${frameslabels} -threads 1 -filter_complex ${filtro}  ${outputFile} 2>> ${errorsFile} </dev/null
 
 printMessage "¡Se ha generado el vídeo `basename ${outputFile}` con exito!"
 
-rm -rf ${TMPDIR}
+#rm -rf ${TMPDIR}

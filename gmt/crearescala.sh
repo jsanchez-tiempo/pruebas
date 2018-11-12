@@ -23,13 +23,13 @@ then
 fi
 
 
-TMPDIR=/tmp
+
 sizediv=45
 
 
 
 # Diretorio temporal
-dir=${TMPDIR}/`basename $(type $0 | awk '{print $3}').$$`
+dir=${TMPBASEDIR}/`basename $(type $0 | awk '{print $3}').$$`
 mkdir -p ${dir}
 
 

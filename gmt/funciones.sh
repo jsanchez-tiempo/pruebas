@@ -497,7 +497,7 @@ function replicarFrames {
     printMessage "Replicando frames de variable ${var}"
     if [ ${slowmotion} -gt 1 ]
     then
-        ${FFMPEG} -f image2 -i ${TMPDIR}/${var}%03d.png -threads 1 -filter_complex "setpts=${slowmotion}*PTS+1" -f image2 ${TMPDIR}/kk%03d.png -vsync 1 2>> ${errorsFile}
+        ${FFMPEG} -f image2 -i ${TMPDIR}/${var}%03d.png -threads 1 -filter_complex "setpts=${slowmotion}*PTS+1" -f image2 ${TMPDIR}/kk%03d.png -vsync 1 2>> ${errorsFile} </dev/null
         rm -rf ${TMPDIR}/${var}*.png
         rename -f "s/kk/${var}/" ${TMPDIR}/kk*.png
     fi
@@ -517,7 +517,7 @@ function replicarFrames {
 
     filtro="[0]${filtro}"
 
-    ${FFMPEG} -f image2 -i ${TMPDIR}/${var}%03d.png -threads 1 -filter_complex "${filtro}" -vsync 0 ${TMPDIR}/kk%03d.png 2>> ${errorsFile}
+    ${FFMPEG} -f image2 -i ${TMPDIR}/${var}%03d.png -threads 1 -filter_complex "${filtro}" -vsync 0 ${TMPDIR}/kk%03d.png 2>> ${errorsFile} </dev/null
 
     rm -rf ${TMPDIR}/${var}*.png
     rename -f "s/kk/${var}/" ${TMPDIR}/kk*.png
@@ -792,7 +792,7 @@ function pintarAnotaciones {
 
     printMessage "Insertando una animación por cada punto calculado"
 #    echo $filtro
-    ${FFMPEG} -f image2 -i  ${TMPDIR}/transparent.png -f image2  -i ${DIRROTULOS}/rotuloprec/rp%03d.png  ${textos} -threads 1 -filter_complex "${filtro}" -r 25 -y -c:v png -f image2 ${TMPDIR}/anot%03d.png 2>> ${errorsFile}
+    ${FFMPEG} -f image2 -i  ${TMPDIR}/transparent.png -f image2  -i ${DIRROTULOS}/rotuloprec/rp%03d.png  ${textos} -threads 1 -filter_complex "${filtro}" -r 25 -y -c:v png -f image2 ${TMPDIR}/anot%03d.png 2>> ${errorsFile} </dev/null
 
 }
 
@@ -844,7 +844,7 @@ function calcularMaximos {
         ${OGR2OGR} -f "ESRI Shapefile" ${TMPDIR}/coords ${TMPDIR}/coords.vrt
         ${OGR2OGR} -f gpkg ${TMPDIR}/merged.gpkg ${TMPDIR}/tmpREG.gmt
         ${OGR2OGR} -f gpkg -append -update ${TMPDIR}/merged.gpkg ${TMPDIR}/coords/output.shp
-        ${OGR2OGR} -f csv ${TMPDIR}/coordsfilter.csv -dialect sqlite -sql "SELECT b.x,b.y,b.z FROM tmpREG a, output b  WHERE contains(a.geom, b.geom)"  ${TMPDIR}/merged.gpkg
+        ${OGR2OGR} -f csv  ${TMPDIR}/coordsfilter.csv -dialect sqlite -sql "SELECT b.x,b.y,b.z FROM tmpREG a, output b  WHERE contains(a.geom, b.geom)"  ${TMPDIR}/merged.gpkg
 
         comando="cat"
         if [ ! -z ${global} ] && [  ${global} -eq 1 ]
@@ -852,7 +852,7 @@ function calcularMaximos {
             comando="${GMT} mapproject -JX${xlength}c/${ylength}c ${RAMP}"
         fi
 
-        awk -F "," 'NR>1{print $1,$2,$3}'  ${TMPDIR}/coordsfilter.csv  | ${GMT} mapproject ${JGEOG} ${RGEOG}|\
+        awk -F "," 'NR>1{print $1,$2,$3}'  ${TMPDIR}/coordsfilter.csv  | tr -d \" | ${GMT} mapproject ${JGEOG} ${RGEOG}|\
          ${comando}  | sort -k3,3 -n -r  > ${TMPDIR}/contourlabels.txt
 
     fi

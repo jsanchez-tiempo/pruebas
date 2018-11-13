@@ -49,7 +49,9 @@ function procesarGH500 {
     ${GMT} grdconvert -Rd ${dataFileDST}\?gh ${dataFileDST} 2>> ${errorsFile}
     ${GMT} grdmath ${Rgeog} ${dataFileDST} 9.81 DIV 10 DIV = ${dataFileDST} 2>> ${errorsFile}
 
-#    ${GMT} grdsample -I0.5 ${dataFileDST}  -G${dataFileDST}
+    ${GMT} grdsample -I0.5 ${dataFileDST}  -G${dataFileDST}
+    ${GMT} grdfilter ${dataFileDST} -G${dataFileDST} -Dp -Fb7 -Nr
+    ${GMT} grdsample -I0.1 ${dataFileDST}  -G${dataFileDST} -nc+c
 }
 
 # Función que pinta el grid de gh500
@@ -59,9 +61,9 @@ function pintarGH500 {
 
     dataFile=$1
 
-    ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb9 -Nr
+#    ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb7 -Nr
     [ ! -z ${dpi} ] && E="-E${dpi}"
-    ${GMT} grdimage ${TMPDIR}/kk  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile}
+    ${GMT} grdimage ${dataFile}  -Qg4 ${E} ${J} ${R} ${X} ${Y} -C${cptGMT} -nc+c  -K -O >> ${tmpFile}
 }
 
 
@@ -193,7 +195,9 @@ function generarMaxMinPresion {
 
     dataFile=$1
 
-    ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb${pressmooth} -Nr
+    [ ${pressmooth} -gt 1 ] &&\
+    ${GMT} grdfilter ${dataFile} -G${TMPDIR}/kk -Dp -Fb${pressmooth} -Nr || \
+    cp  ${dataFile} ${TMPDIR}/kk
 
 
     ${GMT} grdmath ${TMPDIR}/kk DUP EXTREMA 2 EQ MUL = ${TMPDIR}/kk2

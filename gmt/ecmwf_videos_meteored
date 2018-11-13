@@ -50,6 +50,9 @@ else
   exit 1
 fi
 
+# Añadido para que funcione gdal.
+LD_LIBRARY_PATH="/usr/local/lib:/usr/lib"
+export LD_LIBRARY_PATH
 
 
 # Directorios a usar.
@@ -121,8 +124,6 @@ do
     nendframes=`echo ${line} | awk -F ";" '{print $13}' | tr -d " " `
     titulo=`echo ${line} | awk -F ";" '{print $14}' | sed 's/^[[:space:]]*//'`
 
-
-
     fechainicio=`date -d "${fecha} ${pasada} +${start} hours" +%Y%m%d%H`
     fechafin=`date -d "${fecha} ${pasada} +${end} hours" +%Y%m%d%H`
 
@@ -148,16 +149,23 @@ do
         tstarray[${count}]=${tstFile}
         count=$((${count}+1))
 
+        echo "$(datePID): ${cod} ${tipo} ${fechapasada} `printf %03d ${start}`-`printf %03d ${end}` ... "
+
         ${BASE_DIR}/animacion.sh ${tipo} ${fechainicio} ${fechafin} -d ${fechapasada} -f ${outputFile} ${zonageog} ${estilo}\
         ${minutos} ${slowmotion} ${viento} ${presion} ${border} ${nstartframes} ${nendframes} "${titulo}" >> ${log} 2>&1
 
         if [ $? -eq 0 ]
         then
+            echo "$(datePID): ${cod} ${tipo} ${fechapasada} `printf %03d ${start}`-`printf %03d ${end}` ok "
             touch ${tstFile}
             mv ${outputFile} ${WEB_DIR}/
+        else
+            echo "$(datePID): ${cod} ${tipo} ${fechapasada} `printf %03d ${start}`-`printf %03d ${end}` error "
         fi
+    else
+        echo "$(datePID): ${cod} ${tipo} ${fechapasada} `printf %03d ${start}`-`printf %03d ${end}` Generado anteriormente "
     fi
-
+    touch ${lock}
 
 done  < <(sed '1d; /^[[:space:]]*#.*$/d' ${fileconfig})
 
@@ -175,8 +183,9 @@ done
 
 
 # Se limpian ficheros y directorios antiguos.
-find "${OUT_DIR}" -name "finished_${scriptName}" -mtime +1 -type f -exec rm  -f   '{}' \;
-find "${WEB_DIR}" -name "*.mp4"                  -mtime +7 -type f -exec rm  -f   '{}' \;
+find "${OUT_DIR}" -name "finished_${scriptName}"        -mtime +1 -type f -exec rm  -f   '{}' \;
+find "${OUT_DIR}" -name "${scriptName}_????????_??.log" -mtime +7 -type f -exec rm  -f   '{}' \;
+find "${WEB_DIR}" -name "*.mp4"                         -mtime +7 -type f -exec rm  -f   '{}' \;
 
 # Si llega aquí ha terminado el trabajo.
 mv ${lock} ${finished}

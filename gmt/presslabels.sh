@@ -226,7 +226,7 @@ function parseOptions() {
         --press_smooth)
             shift
             pressmoothPARAM=$1
-            ! [[ ${pressmooth} =~ ${repos} ]] || [ ${pressmooth} -le 0 ] || [ $(( ${pressmooth} % 2 )) -eq 0 ] && \
+            ! [[ ${pressmoothPARAM} =~ ${repos} ]] || [ ${pressmoothPARAM} -le 0 ] || [ $(( ${pressmoothPARAM} % 2 )) -eq 0 ] && \
                 { echo "Error: El valor --pressmooth tiene que ser positivo impar mayor que 0" >&2; usage; exit 1; }
             ;;
 
@@ -399,6 +399,7 @@ desfasemin=$((${minreal:0:10}-${min:0:10}))
 [ ! -z ${nminframesMSLParam} ] && nminframesMSL=${nminframesMSLParam}
 [ ! -z ${variablePARAM} ] && variable=${variablePARAM}
 [ ! -z ${presresPARAM} ] && presres=${presresPARAM}
+[ ! -z ${pressmoothPARAM} ] && pressmooth=${pressmoothPARAM}
 
 
 # Número mínimo de frames seguidos que debe aparecer una letra de Baja o Alta presión

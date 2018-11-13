@@ -1634,4 +1634,4 @@ ${FFMPEG} -y  -f image2 -i ${fondoPNG} ${framesViento} ${escalas} -f image2 -i $
 
 printMessage "¡Se ha generado el vídeo `basename ${outputFile}` con exito!"
 
-#rm -rf ${TMPDIR}
+rm -rf ${TMPDIR}

@@ -182,7 +182,7 @@ function checkGrids {
     while [ ${fecha} -le ${fechamax} ]
     do
         dataFile="${DIRNETCDF}/${fechapasada:0:10}/${fecha:0:10}.nc"
-        [ ! -f ${dataFile} ] && { echo "Error: No se ha encontrado el fichero ${dataFile}" >&2; exit 1; }
+        [ ! -f ${dataFile} ] && { rm -rf ${TMPDIR}; echo "Error: No se ha encontrado el fichero ${dataFile}" >&2; exit 1; }
         ln -sf ${dataFile} ${TMPDIR}/${fecha}.nc
 
         fecha=`date -u --date="${fecha:0:8} ${fecha:8:2} +3 hours" +%Y%m%d%H%M`
